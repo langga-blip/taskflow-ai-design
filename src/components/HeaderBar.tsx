@@ -1,7 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Bell, Mic, Grid, Crown, Sparkles, User } from 'lucide-react';
-import { ScreenRoute } from '../types';
+import { Bell, Mic, Grid, Crown, Sparkles, Sun, Moon } from 'lucide-react';
 
 interface HeaderBarProps {
   title?: string;
@@ -17,9 +16,15 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
     setIsVoiceSheetOpen,
     setIsQuickNavOpen,
     userProfile,
+    updateUserProfile,
   } = useApp();
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const isLight = userProfile.themeMode === 'Light';
+
+  const toggleTheme = () => {
+    updateUserProfile({ themeMode: isLight ? 'Dark' : 'Light' });
+  };
 
   const getScreenTitle = (): string => {
     if (title) return title;
@@ -48,7 +53,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-[#0A0C14]/80 backdrop-blur-xl border-b border-[#2E3552] px-4 py-3">
+    <header
+      className={`sticky top-0 z-40 backdrop-blur-xl border-b transition-colors px-4 py-3 ${
+        isLight
+          ? 'bg-white/80 border-slate-200 text-slate-800'
+          : 'bg-[#0A0C14]/80 border-[#2E3552] text-slate-200'
+      }`}
+    >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
         {/* Logo / Brand */}
         <div className="flex items-center gap-3">
@@ -57,13 +68,23 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
             className="flex items-center gap-2 cursor-pointer group"
           >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#7C3AED] to-[#06B6D4] p-0.5 shadow-[0_0_15px_rgba(124,58,237,0.5)] group-hover:scale-105 transition-transform">
-              <div className="w-full h-full bg-[#0A0C14] rounded-[10px] flex items-center justify-center">
+              <div
+                className={`w-full h-full rounded-[10px] flex items-center justify-center ${
+                  isLight ? 'bg-white' : 'bg-[#0A0C14]'
+                }`}
+              >
                 <Sparkles className="w-5 h-5 text-[#06B6D4]" />
               </div>
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-base tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                <span
+                  className={`font-extrabold text-base tracking-tight ${
+                    isLight
+                      ? 'text-slate-900'
+                      : 'bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent'
+                  }`}
+                >
                   TaskFlow AI
                 </span>
                 {userProfile.isSubscribed ? (
@@ -71,12 +92,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
                     <Crown className="w-3 h-3" /> PRO
                   </span>
                 ) : (
-                  <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-[#7C3AED]/20 text-[#A78BFA] rounded-md border border-[#7C3AED]/30">
+                  <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-[#7C3AED]/20 text-[#7C3AED] dark:text-[#A78BFA] rounded-md border border-[#7C3AED]/30">
                     Spectrey
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 font-medium hidden sm:block">
+              <p
+                className={`text-xs font-medium hidden sm:block ${
+                  isLight ? 'text-slate-500' : 'text-slate-400'
+                }`}
+              >
                 {subtitle || getScreenTitle()}
               </p>
             </div>
@@ -84,16 +109,39 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
         </div>
 
         {/* Current Screen Title (Mobile view) */}
-        <div className="sm:hidden font-bold text-sm text-slate-200 truncate">
+        <div
+          className={`sm:hidden font-bold text-sm truncate ${
+            isLight ? 'text-slate-900' : 'text-slate-200'
+          }`}
+        >
           {getScreenTitle()}
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
+          {/* Light / Dark Mode Toggle Button */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+              isLight
+                ? 'bg-slate-100 border-slate-300 text-amber-600 hover:bg-slate-200'
+                : 'bg-[#131726] border-[#2E3552] text-amber-300 hover:text-white hover:border-[#7C3AED]/50'
+            }`}
+            title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+          >
+            {isLight ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+          </button>
+
           {/* Quick Nav Popup Button */}
           <button
+            type="button"
             onClick={() => setIsQuickNavOpen(true)}
-            className="p-2 rounded-xl bg-[#131726] border border-[#2E3552] text-slate-300 hover:text-white hover:border-[#7C3AED]/50 transition-colors cursor-pointer"
+            className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+              isLight
+                ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
+                : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white hover:border-[#7C3AED]/50'
+            }`}
             title="Quick Navigation"
           >
             <Grid className="w-5 h-5" />
@@ -101,8 +149,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
 
           {/* Voice Command Button */}
           <button
+            type="button"
             onClick={() => setIsVoiceSheetOpen(true)}
-            className="p-2 rounded-xl bg-[#131726] border border-[#2E3552] text-[#06B6D4] hover:border-[#06B6D4]/50 transition-colors cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+            className={`p-2 rounded-xl border transition-colors cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.15)] ${
+              isLight
+                ? 'bg-slate-100 border-slate-300 text-[#06B6D4] hover:bg-slate-200'
+                : 'bg-[#131726] border-[#2E3552] text-[#06B6D4] hover:border-[#06B6D4]/50'
+            }`}
             title="Voice Commands"
           >
             <Mic className="w-5 h-5" />
@@ -110,8 +163,13 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
 
           {/* Notifications Bell */}
           <button
+            type="button"
             onClick={() => setIsNotificationSheetOpen(true)}
-            className="relative p-2 rounded-xl bg-[#131726] border border-[#2E3552] text-slate-300 hover:text-white hover:border-[#7C3AED]/50 transition-colors cursor-pointer"
+            className={`relative p-2 rounded-xl border transition-colors cursor-pointer ${
+              isLight
+                ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
+                : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white hover:border-[#7C3AED]/50'
+            }`}
             title="Notifications"
           >
             <Bell className="w-5 h-5" />
@@ -124,11 +182,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
 
           {/* User Profile Avatar */}
           <button
+            type="button"
             onClick={() => setCurrentScreen('profile')}
             className="w-9 h-9 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] p-0.5 cursor-pointer hover:scale-105 transition-transform"
             title="Profile & Settings"
           >
-            <div className="w-full h-full bg-[#131726] rounded-[10px] flex items-center justify-center text-white font-bold text-xs">
+            <div
+              className={`w-full h-full rounded-[10px] flex items-center justify-center font-bold text-xs ${
+                isLight ? 'bg-white text-[#7C3AED]' : 'bg-[#131726] text-white'
+              }`}
+            >
               {userProfile.userName
                 ? userProfile.userName.substring(0, 2).toUpperCase()
                 : 'AR'}

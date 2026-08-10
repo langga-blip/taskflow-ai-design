@@ -8,11 +8,11 @@ import {
   TrendingUp,
   Layers,
   Bot,
-  BarChart2,
 } from 'lucide-react';
 
 export const CustomBottomNavBar: React.FC = () => {
-  const { currentScreen, setCurrentScreen } = useApp();
+  const { currentScreen, setCurrentScreen, userProfile } = useApp();
+  const isLight = userProfile.themeMode === 'Light';
 
   const navItems: { id: ScreenRoute; label: string; icon: React.ReactNode }[] = [
     {
@@ -48,7 +48,13 @@ export const CustomBottomNavBar: React.FC = () => {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-[#0A0C14]/90 backdrop-blur-2xl border-t border-[#2E3552] py-2 px-3">
+    <nav
+      className={`fixed bottom-0 left-0 right-0 z-40 backdrop-blur-2xl border-t py-2 px-3 transition-colors ${
+        isLight
+          ? 'bg-white/95 border-slate-200 shadow-lg'
+          : 'bg-[#0A0C14]/90 border-[#2E3552]'
+      }`}
+    >
       <div className="max-w-md mx-auto flex items-center justify-around">
         {navItems.map((item) => {
           const isActive = currentScreen === item.id;
@@ -58,14 +64,18 @@ export const CustomBottomNavBar: React.FC = () => {
               onClick={() => setCurrentScreen(item.id)}
               className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
                 isActive
-                  ? 'text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/30 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
+                  ? isLight
+                    ? 'text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/40 font-bold'
+                    : 'text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/30 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
+                  : isLight
+                  ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-[#131726]'
               }`}
             >
               <div className={isActive ? 'scale-110 transition-transform' : ''}>
                 {item.icon}
               </div>
-              <span className={`text-[10px] font-medium mt-1 ${isActive ? 'font-bold text-[#06B6D4]' : ''}`}>
+              <span className={`text-[10px] mt-1 ${isActive ? 'font-bold text-[#06B6D4]' : 'font-medium'}`}>
                 {item.label}
               </span>
             </button>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useApp } from '../context/AppContext';
 
 interface GlassCardProps {
   children: React.ReactNode;
@@ -13,12 +14,30 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   onClick,
   hoverEffect = true,
 }) => {
+  let isLight = false;
+  try {
+    const { userProfile } = useApp();
+    isLight = userProfile?.themeMode === 'Light';
+  } catch (e) {
+    isLight = typeof document !== 'undefined' && document.documentElement.classList.contains('light');
+  }
+
+  const baseThemeClasses = isLight
+    ? 'bg-white/95 backdrop-blur-xl border border-slate-200 text-slate-900 shadow-sm'
+    : 'bg-[#131726]/90 backdrop-blur-xl border border-[#2E3552] text-white shadow-xl';
+
+  const hoverClasses = hoverEffect
+    ? isLight
+      ? 'hover:border-[#7C3AED]/40 hover:shadow-md'
+      : 'hover:border-[#7C3AED]/50 hover:shadow-[0_0_25px_rgba(124,58,237,0.15)]'
+    : '';
+
   return (
     <div
       onClick={onClick}
-      className={`bg-[#131726]/90 backdrop-blur-xl border border-[#2E3552] rounded-2xl p-5 shadow-xl transition-all duration-200 ${
-        hoverEffect ? 'hover:border-[#7C3AED]/50 hover:shadow-[0_0_25px_rgba(124,58,237,0.15)]' : ''
-      } ${onClick ? 'cursor-pointer' : ''} ${className}`}
+      className={`${baseThemeClasses} rounded-2xl p-5 transition-all duration-200 ${hoverClasses} ${
+        onClick ? 'cursor-pointer' : ''
+      } ${className}`}
     >
       {children}
     </div>

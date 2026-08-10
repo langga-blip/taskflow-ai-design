@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { NeonButton } from '../components/NeonButton';
-import { CURRENCY_OPTIONS } from '../data/initialData';
+import { SearchableCountrySelector } from '../components/SearchableCountrySelector';
 import {
-  User,
+  CountryData,
+  GENDER_OPTIONS,
+  getCountryByName,
+} from '../data/countriesData';
+import {
   Building2,
-  Globe,
   Crown,
   Cpu,
   LogOut,
@@ -15,6 +18,9 @@ import {
   Check,
   Shield,
   Sparkles,
+  Sun,
+  Moon,
+  Phone,
 } from 'lucide-react';
 
 export const ProfileSettingsScreen: React.FC = () => {
@@ -27,26 +33,42 @@ export const ProfileSettingsScreen: React.FC = () => {
     triggerNotification,
   } = useApp();
 
+  const isLight = userProfile.themeMode === 'Light';
+
   const [userName, setUserName] = useState(userProfile.userName);
   const [businessName, setBusinessName] = useState(userProfile.businessName);
   const [industry, setIndustry] = useState(userProfile.industry);
-  const [currencyCode, setCurrencyCode] = useState(userProfile.currencyCode);
+  const [gender, setGender] = useState(userProfile.gender || 'Prefer not to say');
+
+  const [selectedCountry, setSelectedCountry] = useState<CountryData>(() => {
+    return getCountryByName(userProfile.country || 'United States');
+  });
+
+  const [phoneNumber, setPhoneNumber] = useState(userProfile.phoneNumber || '+1 801 234 5678');
   const [monthlyRevenueGoal, setMonthlyRevenueGoal] = useState(userProfile.monthlyRevenueGoal);
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    const curr = CURRENCY_OPTIONS.find((c) => c.code === currencyCode) || CURRENCY_OPTIONS[0];
 
     updateUserProfile({
       userName,
       businessName,
       industry,
-      currencyCode: curr.code,
-      currencySymbol: curr.symbol,
+      gender,
+      country: selectedCountry.name,
+      currencyCode: selectedCountry.currencyCode,
+      currencySymbol: selectedCountry.currencySymbol,
+      timezoneId: selectedCountry.timezone,
+      phoneNumber,
       monthlyRevenueGoal: Number(monthlyRevenueGoal),
     });
 
-    triggerNotification('Profile Updated', 'Saved Spectrey workspace configuration changes.', 'SYSTEM');
+    triggerNotification('Profile Updated 🎉', `Saved changes for ${selectedCountry.name}.`, 'SYSTEM');
+  };
+
+  const toggleThemeMode = (mode: 'Dark' | 'Light') => {
+    updateUserProfile({ themeMode: mode });
+    triggerNotification('Theme Switched', `Switched to ${mode} mode`, 'SYSTEM');
   };
 
   const handleResetOnboarding = () => {
@@ -58,17 +80,21 @@ export const ProfileSettingsScreen: React.FC = () => {
   return (
     <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in">
       {/* Header Banner */}
-      <GlassCard className="border-[#7C3AED]/40 bg-gradient-to-br from-[#131726] via-[#131726] to-[#1E2338]">
+      <GlassCard className="border-[#7C3AED]/40">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#7C3AED] to-[#2563EB] p-0.5 shadow-[0_0_20px_rgba(124,58,237,0.5)]">
-              <div className="w-full h-full bg-[#0A0C14] rounded-[14px] flex items-center justify-center font-extrabold text-white text-base">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#7C3AED] to-[#2563EB] p-0.5 shadow-[0_0_20px_rgba(124,58,237,0.4)]">
+              <div
+                className={`w-full h-full rounded-[14px] flex items-center justify-center font-extrabold text-base ${
+                  isLight ? 'bg-white text-[#7C3AED]' : 'bg-[#0A0C14] text-white'
+                }`}
+              >
                 {userProfile.userName ? userProfile.userName.substring(0, 2).toUpperCase() : 'AR'}
               </div>
             </div>
             <div>
-              <h1 className="text-xl font-extrabold text-white">{userProfile.userName}</h1>
-              <p className="text-xs text-slate-400">
+              <h1 className="text-xl font-extrabold">{userProfile.userName}</h1>
+              <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                 {userProfile.userEmail} • {userProfile.businessName}
               </p>
             </div>
@@ -81,6 +107,7 @@ export const ProfileSettingsScreen: React.FC = () => {
               </span>
             ) : (
               <button
+                type="button"
                 onClick={() => setCurrentScreen('subscription')}
                 className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#F59E0B] to-[#D97706] text-black font-extrabold text-xs flex items-center gap-1.5 shadow-[0_0_15px_rgba(245,158,11,0.4)] cursor-pointer"
               >
@@ -91,82 +118,162 @@ export const ProfileSettingsScreen: React.FC = () => {
         </div>
       </GlassCard>
 
+      {/* Theme Selection Card */}
+      <GlassCard className="space-y-3">
+        <h2 className="font-bold text-base flex items-center gap-2">
+          {isLight ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5 text-indigo-400" />} Theme Mode
+        </h2>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => toggleThemeMode('Light')}
+            className={`p-3.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              userProfile.themeMode === 'Light'
+                ? 'bg-amber-500/10 border-amber-500 text-amber-600 shadow-sm'
+                : 'bg-slate-100 dark:bg-[#0A0C14] border-slate-300 dark:border-[#2E3552]'
+            }`}
+          >
+            <Sun className="w-4 h-4 text-amber-500" /> Light Mode
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleThemeMode('Dark')}
+            className={`p-3.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              userProfile.themeMode === 'Dark'
+                ? 'bg-[#7C3AED]/20 border-[#7C3AED] text-[#A78BFA] shadow-sm'
+                : 'bg-slate-100 dark:bg-[#0A0C14] border-slate-300 dark:border-[#2E3552]'
+            }`}
+          >
+            <Moon className="w-4 h-4 text-indigo-400" /> Dark Mode
+          </button>
+        </div>
+      </GlassCard>
+
       {/* Settings Form */}
       <GlassCard className="space-y-4">
-        <h2 className="font-bold text-base text-white border-b border-[#2E3552] pb-3 flex items-center gap-2">
+        <h2 className="font-bold text-base border-b border-slate-200 dark:border-[#2E3552] pb-3 flex items-center gap-2">
           <Building2 className="w-5 h-5 text-[#06B6D4]" /> Workspace & Business Profile
         </h2>
 
         <form onSubmit={handleSaveProfile} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Full Name
-              </label>
+              <label className="block text-xs font-semibold mb-1">Full Name</label>
               <input
                 type="text"
                 required
                 value={userName}
                 onChange={(e) => setUserName(e.target.value)}
-                className="w-full bg-[#0A0C14] border border-[#2E3552] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#7C3AED]"
+                className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                  isLight
+                    ? 'bg-slate-100 border-slate-300 text-slate-900'
+                    : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                }`}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Company Name
-              </label>
+              <label className="block text-xs font-semibold mb-1">Company Name</label>
               <input
                 type="text"
                 required
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
-                className="w-full bg-[#0A0C14] border border-[#2E3552] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#7C3AED]"
+                className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                  isLight
+                    ? 'bg-slate-100 border-slate-300 text-slate-900'
+                    : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                }`}
               />
             </div>
           </div>
 
+          {/* Gender Selector */}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5">Gender Option</label>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {GENDER_OPTIONS.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => setGender(g)}
+                  className={`py-2 px-2 rounded-xl border text-xs font-semibold text-center transition-all cursor-pointer truncate ${
+                    gender === g
+                      ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                      : isLight
+                      ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
+                      : 'bg-[#0A0C14] border-[#2E3552] text-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Searchable Country Selector */}
+          <div>
+            <label className="block text-xs font-semibold mb-1 flex items-center justify-between">
+              <span>Country / Region</span>
+              <span className="text-[10px] text-[#06B6D4]">Auto-updates currency & timezone</span>
+            </label>
+            <SearchableCountrySelector
+              selectedCountry={selectedCountry}
+              onSelectCountry={(c) => setSelectedCountry(c)}
+              isLightMode={isLight}
+            />
+          </div>
+
+          {/* Phone Number & Industry & Revenue Target */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Industry
-              </label>
+              <label className="block text-xs font-semibold mb-1">Industry</label>
               <input
                 type="text"
                 required
                 value={industry}
                 onChange={(e) => setIndustry(e.target.value)}
-                className="w-full bg-[#0A0C14] border border-[#2E3552] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#7C3AED]"
+                className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                  isLight
+                    ? 'bg-slate-100 border-slate-300 text-slate-900'
+                    : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                }`}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Primary Currency
+              <label className="block text-xs font-semibold mb-1">
+                Phone Number ({selectedCountry.dialCode})
               </label>
-              <select
-                value={currencyCode}
-                onChange={(e) => setCurrencyCode(e.target.value)}
-                className="w-full bg-[#0A0C14] border border-[#2E3552] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#7C3AED]"
-              >
-                {CURRENCY_OPTIONS.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.code} ({c.symbol})
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                    isLight
+                      ? 'bg-slate-100 border-slate-300 text-slate-900'
+                      : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                  }`}
+                />
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Monthly Revenue Target
+              <label className="block text-xs font-semibold mb-1">
+                Monthly Target ({selectedCountry.currencyCode})
               </label>
               <input
                 type="number"
                 required
                 value={monthlyRevenueGoal}
                 onChange={(e) => setMonthlyRevenueGoal(Number(e.target.value))}
-                className="w-full bg-[#0A0C14] border border-[#2E3552] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#7C3AED]"
+                className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                  isLight
+                    ? 'bg-slate-100 border-slate-300 text-slate-900'
+                    : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                }`}
               />
             </div>
           </div>
@@ -181,10 +288,10 @@ export const ProfileSettingsScreen: React.FC = () => {
 
       {/* AI Provider Config */}
       <GlassCard className="space-y-3">
-        <h2 className="font-bold text-base text-white flex items-center gap-2">
+        <h2 className="font-bold text-base flex items-center gap-2">
           <Cpu className="w-5 h-5 text-[#A78BFA]" /> Executive AI Engine Selector
         </h2>
-        <p className="text-xs text-slate-400">
+        <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
           Choose which AI model handles your Daily Strategy, Task Generation & Chat Assistant.
         </p>
 
@@ -196,6 +303,7 @@ export const ProfileSettingsScreen: React.FC = () => {
           ].map((provider) => (
             <button
               key={provider.id}
+              type="button"
               onClick={() => {
                 setAiProvider(provider.id as any);
                 triggerNotification('AI Model Switch', `Switched active provider to ${provider.name}`, 'SYSTEM');
@@ -203,6 +311,8 @@ export const ProfileSettingsScreen: React.FC = () => {
               className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
                 aiProvider === provider.id
                   ? 'bg-[#7C3AED]/20 border-[#7C3AED] shadow-[0_0_15px_rgba(124,58,237,0.3)]'
+                  : isLight
+                  ? 'bg-slate-100 border-slate-300 hover:border-slate-400'
                   : 'bg-[#0A0C14] border-[#2E3552] hover:border-slate-400'
               }`}
             >
@@ -212,8 +322,8 @@ export const ProfileSettingsScreen: React.FC = () => {
                   <Check className="w-4 h-4 text-[#00E676]" />
                 )}
               </div>
-              <h3 className="font-bold text-sm text-white mt-2">{provider.name}</h3>
-              <p className="text-[10px] text-slate-400 mt-0.5">{provider.tag}</p>
+              <h3 className="font-bold text-sm mt-2">{provider.name}</h3>
+              <p className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{provider.tag}</p>
             </button>
           ))}
         </div>
@@ -222,18 +332,28 @@ export const ProfileSettingsScreen: React.FC = () => {
       {/* Account Management & Reset */}
       <div className="flex flex-col sm:flex-row gap-3">
         <button
+          type="button"
           onClick={handleResetOnboarding}
-          className="flex-1 py-3 px-4 rounded-2xl bg-[#131726] border border-[#2E3552] hover:border-amber-500/50 text-xs font-bold text-amber-400 flex items-center justify-center gap-2 cursor-pointer transition-colors"
+          className={`flex-1 py-3 px-4 rounded-2xl border text-xs font-bold text-amber-500 flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+            isLight
+              ? 'bg-white border-slate-300 hover:bg-slate-100'
+              : 'bg-[#131726] border-[#2E3552] hover:border-amber-500/50'
+          }`}
         >
           <RotateCcw className="w-4 h-4" /> Re-run Setup Onboarding Wizard
         </button>
 
         <button
+          type="button"
           onClick={() => {
             triggerNotification('Signed Out', 'You have been signed out of your workspace.', 'SYSTEM');
             setCurrentScreen('landing');
           }}
-          className="flex-1 py-3 px-4 rounded-2xl bg-[#131726] border border-[#2E3552] hover:border-red-500/50 text-xs font-bold text-red-400 flex items-center justify-center gap-2 cursor-pointer transition-colors"
+          className={`flex-1 py-3 px-4 rounded-2xl border text-xs font-bold text-red-500 flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+            isLight
+              ? 'bg-white border-slate-300 hover:bg-slate-100'
+              : 'bg-[#131726] border-[#2E3552] hover:border-red-500/50'
+          }`}
         >
           <LogOut className="w-4 h-4" /> Sign Out of TaskFlow AI
         </button>
