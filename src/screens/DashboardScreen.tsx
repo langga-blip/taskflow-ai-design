@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { NeonButton } from '../components/NeonButton';
@@ -17,11 +17,14 @@ import {
   Layers,
   BarChart3,
   Globe,
+  Edit2,
+  DollarSign,
 } from 'lucide-react';
 
 export const DashboardScreen: React.FC = () => {
   const {
     userProfile,
+    updateUserProfile,
     tasks,
     toggleTask,
     setCurrentScreen,
@@ -32,12 +35,57 @@ export const DashboardScreen: React.FC = () => {
     triggerNotification,
   } = useApp();
 
+  const [now, setNow] = useState(new Date());
+
+  React.useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedDate = now.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  const formattedTime = now.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [isEditRevModalOpen, setIsEditRevModalOpen] = useState(false);
+  const [tempCurrentRev, setTempCurrentRev] = useState<string | number>(
+    userProfile.currentMonthlyRevenue !== undefined ? userProfile.currentMonthlyRevenue : 3450
+  );
+
+  useEffect(() => {
+    if (isEditRevModalOpen) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [isEditRevModalOpen]);
 
   // Revenue metrics
   const revGoal = userProfile.monthlyRevenueGoal || 10000;
-  const currentRev = userProfile.currentMonthlyRevenue || 3450;
-  const revPercent = Math.min(100, Math.round((currentRev / revGoal) * 100));
+  const currentRev = userProfile.currentMonthlyRevenue !== undefined ? userProfile.currentMonthlyRevenue : 0;
+  const revPercent = revGoal > 0 ? Math.min(100, Math.round((currentRev / revGoal) * 100)) : 0;
+  const isLight = userProfile.themeMode === 'Light';
+
+  const handleSaveRevenueFromDashboard = (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = typeof tempCurrentRev === 'string' ? parseFloat(tempCurrentRev) : tempCurrentRev;
+    const finalVal = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+
+    updateUserProfile({ currentMonthlyRevenue: finalVal });
+    triggerNotification(
+      'Current Revenue Updated 💰',
+      `Monthly revenue updated to ${formatRevenue(finalVal)}.`,
+      'PAYMENTS'
+    );
+    setIsEditRevModalOpen(false);
+  };
 
   // Task metrics
   const completedCount = tasks.filter((t) => t.isCompleted).length;
@@ -62,7 +110,53 @@ export const DashboardScreen: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-24 animate-fade-in max-w-4xl mx-auto">
+    <div className="space-y-6 pb-24 animate-fade-in max-w-4xl mx-auto overflow-x-hidden">
+      {/* Date & Time Header Bar */}
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl border shadow-md ${
+          isLight
+            ? 'bg-gradient-to-r from-purple-50 via-white to-purple-50 border-purple-200 text-slate-800'
+            : 'bg-gradient-to-r from-[#131726] via-[#1E2338] to-[#131726] border-[#2E3552] text-slate-200'
+        }`}
+      >
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`p-2 rounded-xl ${
+              isLight
+                ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                : 'bg-[#06B6D4]/20 border border-[#06B6D4]/30 text-[#06B6D4]'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+          </div>
+          <div>
+            <span
+              className={`text-[10px] font-extrabold uppercase tracking-wider block ${
+                isLight ? 'text-purple-700' : 'text-[#06B6D4]'
+              }`}
+            >
+              System Date & Time
+            </span>
+            <span className="text-xs sm:text-sm font-extrabold">
+              {formattedDate}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div
+            className={`px-3 py-1.5 rounded-xl border font-mono font-bold text-xs flex items-center gap-2 ${
+              isLight
+                ? 'bg-white border-purple-200 text-purple-900 shadow-sm'
+                : 'bg-[#0A0C14] border-[#2E3552] text-[#00E676]'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-[#00E676] animate-ping" />
+            {formattedTime}
+          </div>
+        </div>
+      </div>
+
       {/* Greeting Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-[#131726] via-[#1E2338] to-[#131726] border border-[#2E3552] p-5 rounded-2xl shadow-xl">
         <div>
@@ -81,28 +175,51 @@ export const DashboardScreen: React.FC = () => {
       </div>
 
       {/* Revenue Tracker Hero Card */}
-      <GlassCard className="space-y-4 border-[#7C3AED]/30 bg-gradient-to-br from-[#131726] via-[#131726] to-[#1E2338]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-2.5 bg-[#00E676]/10 border border-[#00E676]/30 rounded-xl text-[#00E676]">
+      <GlassCard className="space-y-4 border-[#7C3AED]/30 bg-gradient-to-br from-[#131726] via-[#131726] to-[#1E2338] overflow-hidden max-w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+            <div className="p-2.5 bg-[#00E676]/10 border border-[#00E676]/30 rounded-xl text-[#00E676] flex-shrink-0">
               <TrendingUp className="w-5 h-5" />
             </div>
-            <div>
-              <span className="text-xs font-semibold text-slate-400">Monthly Revenue Progress</span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            <div className="min-w-0 flex-1">
+              <span className={`text-xs font-semibold block ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                Monthly Revenue Progress
+              </span>
+              <h2 className={`text-xl sm:text-2xl font-extrabold tracking-tight truncate ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 {formatRevenue(currentRev)}
-                <span className="text-xs font-medium text-slate-400 ml-2">
+                <span className={`text-xs font-medium ml-2 block sm:inline ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                   / {formatRevenue(revGoal, false)} goal
                 </span>
               </h2>
             </div>
           </div>
-          <button
-            onClick={() => setCurrentScreen('revenue')}
-            className="px-3 py-1.5 rounded-xl bg-[#1E2338] border border-[#2E3552] hover:border-[#00E676] text-xs font-bold text-[#00E676] flex items-center gap-1 cursor-pointer transition-colors"
-          >
-            Manage <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
+
+          {/* Action buttons vertically stacked: Edit Revenue above, Manage below */}
+          <div className="flex flex-col items-stretch sm:items-end gap-2 flex-shrink-0 pt-1 sm:pt-0">
+            <button
+              onClick={() => {
+                setTempCurrentRev(currentRev);
+                setIsEditRevModalOpen(true);
+              }}
+              className={`px-3.5 py-1.5 rounded-xl border text-xs font-bold text-[#00E676] flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                isLight
+                  ? 'bg-emerald-50 border-emerald-300 hover:bg-emerald-100'
+                  : 'bg-[#0A0C14] border-[#2E3552] hover:border-[#00E676]'
+              }`}
+            >
+              <Edit2 className="w-3.5 h-3.5" /> Edit Revenue
+            </button>
+            <button
+              onClick={() => setCurrentScreen('revenue')}
+              className={`px-3.5 py-1.5 rounded-xl border text-xs font-bold text-[#06B6D4] flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                isLight
+                  ? 'bg-cyan-50 border-cyan-300 hover:bg-cyan-100'
+                  : 'bg-[#1E2338] border-[#2E3552] hover:border-[#06B6D4]'
+              }`}
+            >
+              Manage <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* Progress Bar */}
@@ -195,9 +312,9 @@ export const DashboardScreen: React.FC = () => {
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+                    className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${
                       task.isCompleted
-                        ? 'bg-[#00E676] border-[#00E676] text-black'
+                        ? 'bg-[#7C3AED] border-[#7C3AED] text-white shadow-[0_0_8px_rgba(124,58,237,0.5)]'
                         : 'border-slate-500 hover:border-[#7C3AED]'
                     }`}
                   >
@@ -288,12 +405,15 @@ export const DashboardScreen: React.FC = () => {
               className="flex items-center justify-between p-3.5 bg-[#0A0C14] border border-[#2E3552] rounded-xl hover:border-[#7C3AED]/40 transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={t.isCompleted}
-                  onChange={() => toggleTask(t.id)}
-                  className="w-4 h-4 rounded text-[#7C3AED] focus:ring-0 cursor-pointer"
-                />
+                <div
+                  className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors shrink-0 ${
+                    t.isCompleted
+                      ? 'bg-[#7C3AED] border-[#7C3AED] text-white shadow-[0_0_8px_rgba(124,58,237,0.5)]'
+                      : 'border-slate-500 hover:border-[#7C3AED]'
+                  }`}
+                >
+                  {t.isCompleted && <CheckCircle2 className="w-4 h-4" />}
+                </div>
                 <div>
                   <p className={`text-xs font-bold text-slate-200 ${t.isCompleted ? 'line-through text-slate-500' : ''}`}>
                     {t.title}
@@ -314,6 +434,54 @@ export const DashboardScreen: React.FC = () => {
           ))}
         </div>
       </GlassCard>
+
+      {/* Edit Revenue Modal */}
+      {isEditRevModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md bg-[#0A0C14] border border-[#2E3552] rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#2E3552] pb-3">
+              <h2 className="font-bold text-lg text-white flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-[#00E676]" /> Edit Current Monthly Revenue
+              </h2>
+              <button
+                onClick={() => setIsEditRevModalOpen(false)}
+                className="p-2 rounded-xl bg-[#131726] border border-[#2E3552] text-slate-400 hover:text-white cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRevenueFromDashboard} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Current Monthly Revenue ({userProfile.currencySymbol})
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">
+                    {userProfile.currencySymbol}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={tempCurrentRev}
+                    onChange={(e) => setTempCurrentRev(e.target.value)}
+                    className="w-full bg-[#131726] border border-[#2E3552] rounded-xl pl-9 pr-4 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:border-[#00E676]"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Directly update your current active revenue for this month.
+                </p>
+              </div>
+
+              <NeonButton type="submit" size="md" fullWidth>
+                Update Revenue
+              </NeonButton>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

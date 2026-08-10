@@ -60,45 +60,45 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
           : 'bg-[#0A0C14]/80 border-[#2E3552] text-slate-200'
       }`}
     >
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 w-full overflow-hidden">
         {/* Logo / Brand */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
           <div
             onClick={() => setCurrentScreen('dashboard')}
-            className="flex items-center gap-2 cursor-pointer group"
+            className="flex items-center gap-2 cursor-pointer group min-w-0"
           >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#7C3AED] to-[#06B6D4] p-0.5 shadow-[0_0_15px_rgba(124,58,237,0.5)] group-hover:scale-105 transition-transform">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#7C3AED] to-[#06B6D4] p-0.5 shadow-[0_0_15px_rgba(124,58,237,0.5)] group-hover:scale-105 transition-transform flex-shrink-0">
               <div
                 className={`w-full h-full rounded-[10px] flex items-center justify-center ${
                   isLight ? 'bg-white' : 'bg-[#0A0C14]'
                 }`}
               >
-                <Sparkles className="w-5 h-5 text-[#06B6D4]" />
+                <Sparkles className="w-4 h-4 text-[#06B6D4]" />
               </div>
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1">
                 <span
-                  className={`font-extrabold text-base tracking-tight ${
+                  className={`font-extrabold text-sm sm:text-base tracking-tight whitespace-nowrap ${
                     isLight
                       ? 'text-slate-900'
                       : 'bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent'
                   }`}
                 >
-                  TaskFlow AI
+                  TaskFlow
                 </span>
                 {userProfile.isSubscribed ? (
-                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-[#F59E0B]/20 text-[#F59E0B] rounded-md border border-[#F59E0B]/40 flex items-center gap-1">
-                    <Crown className="w-3 h-3" /> PRO
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[#F59E0B]/20 text-[#F59E0B] rounded-md border border-[#F59E0B]/40 flex items-center gap-0.5 flex-shrink-0">
+                    <Crown className="w-2.5 h-2.5" /> PRO
                   </span>
                 ) : (
-                  <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-[#7C3AED]/20 text-[#7C3AED] dark:text-[#A78BFA] rounded-md border border-[#7C3AED]/30">
-                    Spectrey
+                  <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-[#7C3AED]/20 text-[#7C3AED] dark:text-[#A78BFA] rounded-md border border-[#7C3AED]/30 flex-shrink-0">
+                    AI
                   </span>
                 )}
               </div>
               <p
-                className={`text-xs font-medium hidden sm:block ${
+                className={`text-[11px] font-medium hidden md:block truncate ${
                   isLight ? 'text-slate-500' : 'text-slate-400'
                 }`}
               >
@@ -108,83 +108,83 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
           </div>
         </div>
 
-        {/* Current Screen Title (Mobile view) */}
+        {/* Current Screen Title (Compact Mobile view) */}
         <div
-          className={`sm:hidden font-bold text-sm truncate ${
-            isLight ? 'text-slate-900' : 'text-slate-200'
+          className={`hidden xs:block md:hidden font-bold text-xs truncate max-w-[90px] ${
+            isLight ? 'text-slate-800' : 'text-slate-200'
           }`}
         >
           {getScreenTitle()}
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2">
-          {/* Light / Dark Mode Toggle Button */}
+        {/* Action Controls - Horizontally Swipeable Icon Bar */}
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 px-1.5 touch-pan-x ml-auto w-[170px] xs:w-[205px] sm:w-auto max-w-[170px] xs:max-w-[205px] sm:max-w-none flex-nowrap shrink-0 scroll-smooth rounded-xl border border-[#2E3552]/50 bg-[#131726]/60 sm:bg-transparent sm:border-none sm:p-0 shadow-inner">
+          {/* 1. Light / Dark Mode Toggle Button */}
           <button
             type="button"
             onClick={toggleTheme}
-            className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+            className={`p-2 rounded-xl border transition-colors cursor-pointer flex-shrink-0 ${
               isLight
                 ? 'bg-slate-100 border-slate-300 text-amber-600 hover:bg-slate-200'
                 : 'bg-[#131726] border-[#2E3552] text-amber-300 hover:text-white hover:border-[#7C3AED]/50'
             }`}
             title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
           >
-            {isLight ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+            {isLight ? <Moon className="w-4 h-4 sm:w-5 sm:h-5" /> : <Sun className="w-4 h-4 sm:w-5 sm:h-5" />}
           </button>
 
-          {/* Quick Nav Popup Button */}
+          {/* 2. Quick Nav Popup Button */}
           <button
             type="button"
             onClick={() => setIsQuickNavOpen(true)}
-            className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+            className={`p-2 rounded-xl border transition-colors cursor-pointer flex-shrink-0 ${
               isLight
                 ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
                 : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white hover:border-[#7C3AED]/50'
             }`}
             title="Quick Navigation"
           >
-            <Grid className="w-5 h-5" />
+            <Grid className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
-          {/* Voice Command Button */}
+          {/* 3. Voice Command Button */}
           <button
             type="button"
             onClick={() => setIsVoiceSheetOpen(true)}
-            className={`p-2 rounded-xl border transition-colors cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.15)] ${
+            className={`p-2 rounded-xl border transition-colors cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.15)] flex-shrink-0 ${
               isLight
                 ? 'bg-slate-100 border-slate-300 text-[#06B6D4] hover:bg-slate-200'
                 : 'bg-[#131726] border-[#2E3552] text-[#06B6D4] hover:border-[#06B6D4]/50'
             }`}
             title="Voice Commands"
           >
-            <Mic className="w-5 h-5" />
+            <Mic className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
 
-          {/* Notifications Bell */}
+          {/* 4. Notifications Bell */}
           <button
             type="button"
             onClick={() => setIsNotificationSheetOpen(true)}
-            className={`relative p-2 rounded-xl border transition-colors cursor-pointer ${
+            className={`relative p-2 rounded-xl border transition-colors cursor-pointer flex-shrink-0 ${
               isLight
                 ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
                 : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white hover:border-[#7C3AED]/50'
             }`}
             title="Notifications"
           >
-            <Bell className="w-5 h-5" />
+            <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#EF4444] text-white font-bold text-[10px] rounded-full flex items-center justify-center animate-pulse border border-[#0A0C14]">
+              <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-[#EF4444] text-white font-bold text-[9px] sm:text-[10px] rounded-full flex items-center justify-center animate-pulse border border-[#0A0C14]">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
 
-          {/* User Profile Avatar */}
+          {/* 5. User Profile Avatar */}
           <button
             type="button"
             onClick={() => setCurrentScreen('profile')}
-            className="w-9 h-9 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] p-0.5 cursor-pointer hover:scale-105 transition-transform"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] p-0.5 cursor-pointer hover:scale-105 transition-transform flex-shrink-0"
             title="Profile & Settings"
           >
             <div

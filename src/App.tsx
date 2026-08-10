@@ -70,7 +70,7 @@ const MainAppContent: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen font-sans selection:bg-[#7C3AED] selection:text-white transition-colors duration-200 ${
+      className={`min-h-screen max-w-full overflow-x-hidden font-sans selection:bg-[#7C3AED] selection:text-white transition-colors duration-200 ${
         isLight
           ? 'bg-slate-50 text-slate-900'
           : 'bg-[#0A0C14] text-slate-100'
@@ -80,7 +80,7 @@ const MainAppContent: React.FC = () => {
       {!isFullscreenView && <HeaderBar />}
 
       {/* Screen Body */}
-      <main className={!isFullscreenView ? 'p-4 sm:p-6' : ''}>
+      <main className={!isFullscreenView ? 'p-4 sm:p-6 max-w-full overflow-x-hidden' : 'max-w-full overflow-x-hidden'}>
         {renderScreen()}
       </main>
 

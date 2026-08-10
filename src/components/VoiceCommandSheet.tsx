@@ -130,16 +130,16 @@ export const VoiceCommandSheet: React.FC = () => {
         </div>
 
         {/* Input box */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full min-w-0">
           <input
             type="text"
             value={commandText}
             onChange={(e) => setCommandText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleExecuteCommand()}
             placeholder="e.g. Add task: Pitch $5k retainer proposal"
-            className="flex-1 bg-[#131726] border border-[#2E3552] rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#06B6D4]"
+            className="flex-1 min-w-0 bg-[#131726] border border-[#2E3552] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#06B6D4]"
           />
-          <NeonButton onClick={() => handleExecuteCommand()} size="md">
+          <NeonButton onClick={() => handleExecuteCommand()} size="md" className="shrink-0">
             <Send className="w-4 h-4" /> Run
           </NeonButton>
         </div>

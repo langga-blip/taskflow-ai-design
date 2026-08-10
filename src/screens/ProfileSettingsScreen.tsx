@@ -45,10 +45,21 @@ export const ProfileSettingsScreen: React.FC = () => {
   });
 
   const [phoneNumber, setPhoneNumber] = useState(userProfile.phoneNumber || '+1 801 234 5678');
-  const [monthlyRevenueGoal, setMonthlyRevenueGoal] = useState(userProfile.monthlyRevenueGoal);
+  const [currentMonthlyRevenue, setCurrentMonthlyRevenue] = useState<string | number>(
+    userProfile.currentMonthlyRevenue !== undefined ? userProfile.currentMonthlyRevenue : 0
+  );
+  const [monthlyRevenueGoal, setMonthlyRevenueGoal] = useState<string | number>(
+    userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 10000
+  );
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const parsedRev = typeof currentMonthlyRevenue === 'string' ? parseFloat(currentMonthlyRevenue) : currentMonthlyRevenue;
+    const finalRev = isNaN(parsedRev) || parsedRev < 0 ? 0 : parsedRev;
+
+    const parsedGoal = typeof monthlyRevenueGoal === 'string' ? parseFloat(monthlyRevenueGoal) : monthlyRevenueGoal;
+    const finalGoal = isNaN(parsedGoal) || parsedGoal <= 0 ? 10000 : parsedGoal;
 
     updateUserProfile({
       userName,
@@ -60,7 +71,8 @@ export const ProfileSettingsScreen: React.FC = () => {
       currencySymbol: selectedCountry.currencySymbol,
       timezoneId: selectedCountry.timezone,
       phoneNumber,
-      monthlyRevenueGoal: Number(monthlyRevenueGoal),
+      currentMonthlyRevenue: finalRev,
+      monthlyRevenueGoal: finalGoal,
     });
 
     triggerNotification('Profile Updated 🎉', `Saved changes for ${selectedCountry.name}.`, 'SYSTEM');
@@ -78,7 +90,7 @@ export const ProfileSettingsScreen: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in">
+    <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in overflow-x-hidden max-w-full">
       {/* Header Banner */}
       <GlassCard className="border-[#7C3AED]/40">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -224,8 +236,8 @@ export const ProfileSettingsScreen: React.FC = () => {
             />
           </div>
 
-          {/* Phone Number & Industry & Revenue Target */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Phone Number & Industry & Revenue Numbers */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-semibold mb-1">Industry</label>
               <input
@@ -262,19 +274,50 @@ export const ProfileSettingsScreen: React.FC = () => {
 
             <div>
               <label className="block text-xs font-semibold mb-1">
-                Monthly Target ({selectedCountry.currencyCode})
+                Current Revenue ({selectedCountry.currencyCode})
               </label>
-              <input
-                type="number"
-                required
-                value={monthlyRevenueGoal}
-                onChange={(e) => setMonthlyRevenueGoal(Number(e.target.value))}
-                className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
-                  isLight
-                    ? 'bg-slate-100 border-slate-300 text-slate-900'
-                    : 'bg-[#0A0C14] border-[#2E3552] text-white'
-                }`}
-              />
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm font-mono">
+                  {selectedCountry.currencySymbol}
+                </span>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  required
+                  value={currentMonthlyRevenue}
+                  onChange={(e) => setCurrentMonthlyRevenue(e.target.value)}
+                  className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm font-semibold focus:outline-none focus:border-[#00E676] ${
+                    isLight
+                      ? 'bg-slate-100 border-slate-300 text-slate-900'
+                      : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold mb-1">
+                Monthly Target Goal ({selectedCountry.currencyCode})
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm font-mono">
+                  {selectedCountry.currencySymbol}
+                </span>
+                <input
+                  type="number"
+                  step="any"
+                  min="0"
+                  required
+                  value={monthlyRevenueGoal}
+                  onChange={(e) => setMonthlyRevenueGoal(e.target.value)}
+                  className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm font-semibold focus:outline-none focus:border-[#7C3AED] ${
+                    isLight
+                      ? 'bg-slate-100 border-slate-300 text-slate-900'
+                      : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                  }`}
+                />
+              </div>
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { CURRENCY_OPTIONS } from '../data/initialData';
 import { GlassCard } from '../components/GlassCard';
@@ -33,12 +33,40 @@ export const RevenueDashboardScreen: React.FC = () => {
   const [incomeAmount, setIncomeAmount] = useState('');
   const [incomeNotes, setIncomeNotes] = useState('');
 
-  const [isEditGoalOpen, setIsEditGoalOpen] = useState(false);
-  const [newTargetGoal, setNewTargetGoal] = useState(userProfile.monthlyRevenueGoal || 10000);
+  const [isEditRevenueOpen, setIsEditRevenueOpen] = useState(false);
+  const [newCurrentRevenue, setNewCurrentRevenue] = useState<string | number>(
+    userProfile.currentMonthlyRevenue !== undefined ? userProfile.currentMonthlyRevenue : 0
+  );
 
-  const currentRev = userProfile.currentMonthlyRevenue || 3450;
+  const [isEditGoalOpen, setIsEditGoalOpen] = useState(false);
+  const [newTargetGoal, setNewTargetGoal] = useState<string | number>(
+    userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 10000
+  );
+
+  useEffect(() => {
+    if (isEditRevenueOpen || isEditGoalOpen || isLogIncomeOpen || isCurrencyModalOpen) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [isEditRevenueOpen, isEditGoalOpen, isLogIncomeOpen, isCurrencyModalOpen]);
+
+  const currentRev = userProfile.currentMonthlyRevenue !== undefined ? userProfile.currentMonthlyRevenue : 0;
   const revGoal = userProfile.monthlyRevenueGoal || 10000;
-  const percentAchieved = Math.min(100, Math.round((currentRev / revGoal) * 100));
+  const percentAchieved = revGoal > 0 ? Math.min(100, Math.round((currentRev / revGoal) * 100)) : 0;
+  const isLight = userProfile.themeMode === 'Light';
+
+  const handleSaveRevenue = (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = typeof newCurrentRevenue === 'string' ? parseFloat(newCurrentRevenue) : newCurrentRevenue;
+    const finalVal = isNaN(parsed) || parsed < 0 ? 0 : parsed;
+
+    updateUserProfile({ currentMonthlyRevenue: finalVal });
+    triggerNotification(
+      'Current Revenue Updated 💰',
+      `Current monthly revenue updated to ${formatRevenue(finalVal)}.`,
+      'PAYMENTS'
+    );
+    setIsEditRevenueOpen(false);
+  };
 
   const handleLogIncome = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,7 +97,7 @@ export const RevenueDashboardScreen: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in">
+    <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in overflow-x-hidden max-w-full">
       {/* Header Banner */}
       <GlassCard className="border-[#00E676]/40 bg-gradient-to-br from-[#131726] via-[#131726] to-[#1E2338]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -102,20 +130,34 @@ export const RevenueDashboardScreen: React.FC = () => {
         <GlassCard className="sm:col-span-2 space-y-4 border-[#00E676]/30">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-400">Current Monthly Revenue</span>
-            <button
-              onClick={() => setIsEditGoalOpen(true)}
-              className="text-xs font-bold text-[#06B6D4] hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <Edit2 className="w-3.5 h-3.5" /> Edit Target
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setNewCurrentRevenue(currentRev);
+                  setIsEditRevenueOpen(true);
+                }}
+                className="text-xs font-bold text-[#00E676] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Edit2 className="w-3.5 h-3.5" /> Edit Revenue
+              </button>
+              <button
+                onClick={() => {
+                  setNewTargetGoal(revGoal);
+                  setIsEditGoalOpen(true);
+                }}
+                className="text-xs font-bold text-[#06B6D4] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Edit2 className="w-3.5 h-3.5" /> Edit Target
+              </button>
+            </div>
           </div>
 
           <div className="space-y-1">
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+            <h2 className={`text-3xl sm:text-4xl font-extrabold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
               {formatRevenue(currentRev)}
             </h2>
-            <p className="text-xs text-slate-400">
-              Target Goal: <span className="text-white font-bold">{formatRevenue(revGoal, false)}</span>
+            <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+              Target Goal: <span className={`font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{formatRevenue(revGoal, false)}</span>
             </p>
           </div>
 
@@ -270,6 +312,54 @@ export const RevenueDashboardScreen: React.FC = () => {
 
               <NeonButton type="submit" size="md" fullWidth>
                 Log Payment To Dashboard
+              </NeonButton>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Current Revenue Modal */}
+      {isEditRevenueOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md bg-[#0A0C14] border border-[#2E3552] rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#2E3552] pb-3">
+              <h2 className="font-bold text-lg text-white flex items-center gap-2">
+                <DollarSign className="w-5 h-5 text-[#00E676]" /> Edit Current Monthly Revenue
+              </h2>
+              <button
+                onClick={() => setIsEditRevenueOpen(false)}
+                className="p-2 rounded-xl bg-[#131726] border border-[#2E3552] text-slate-400 hover:text-white cursor-pointer"
+              >
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRevenue} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Current Monthly Revenue ({userProfile.currencySymbol})
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">
+                    {userProfile.currencySymbol}
+                  </span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={newCurrentRevenue}
+                    onChange={(e) => setNewCurrentRevenue(e.target.value)}
+                    className="w-full bg-[#131726] border border-[#2E3552] rounded-xl pl-9 pr-4 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:border-[#00E676]"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  This directly sets your current active monthly revenue total for this month.
+                </p>
+              </div>
+
+              <NeonButton type="submit" size="md" fullWidth>
+                Update Current Revenue
               </NeonButton>
             </form>
           </div>

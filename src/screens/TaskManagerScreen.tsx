@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 
 export const TaskManagerScreen: React.FC = () => {
-  const { tasks, saveTask, toggleTask, deleteTask, triggerNotification } = useApp();
+  const { userProfile, tasks, saveTask, toggleTask, deleteTask, triggerNotification } = useApp();
+  const isLight = userProfile.themeMode === 'Light';
 
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<'ALL' | 'ACTIVE' | 'COMPLETED'>('ALL');
@@ -108,14 +109,14 @@ export const TaskManagerScreen: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in">
+    <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in overflow-x-hidden max-w-full">
       {/* Top Header Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-white flex items-center gap-2">
+          <h1 className={`text-2xl font-extrabold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
             <CheckSquare className="w-6 h-6 text-[#7C3AED]" /> Task Manager
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className={`text-xs mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
             Prioritized business execution queue • {filteredTasks.length} tasks
           </p>
         </div>
@@ -128,17 +129,25 @@ export const TaskManagerScreen: React.FC = () => {
       <GlassCard className="space-y-3 p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search tasks by keyword..."
-              className="w-full bg-[#0A0C14] border border-[#2E3552] rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#7C3AED]"
+              className={`w-full rounded-xl pl-10 pr-4 py-2 text-xs border focus:outline-none focus:border-[#7C3AED] ${
+                isLight
+                  ? 'bg-white border-purple-200 text-slate-900 placeholder-slate-400'
+                  : 'bg-[#0A0C14] border-[#2E3552] text-white placeholder-slate-500'
+              }`}
             />
           </div>
 
-          <div className="flex items-center gap-1 bg-[#0A0C14] border border-[#2E3552] rounded-xl p-1 text-xs">
+          <div
+            className={`flex items-center gap-1 border rounded-xl p-1 text-xs ${
+              isLight ? 'bg-slate-100 border-purple-200' : 'bg-[#0A0C14] border-[#2E3552]'
+            }`}
+          >
             {(['ALL', 'ACTIVE', 'COMPLETED'] as const).map((status) => (
               <button
                 key={status}
@@ -146,6 +155,8 @@ export const TaskManagerScreen: React.FC = () => {
                 className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
                   selectedStatus === status
                     ? 'bg-[#7C3AED] text-white'
+                    : isLight
+                    ? 'text-slate-600 hover:text-slate-900'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -164,6 +175,8 @@ export const TaskManagerScreen: React.FC = () => {
               className={`px-3 py-1.5 rounded-xl font-medium transition-colors cursor-pointer whitespace-nowrap ${
                 selectedCategory === c.id
                   ? 'bg-[#06B6D4] text-black font-bold shadow-[0_0_12px_rgba(6,182,212,0.3)]'
+                  : isLight
+                  ? 'bg-purple-50 text-purple-900 hover:bg-purple-100 border border-purple-200'
                   : 'bg-[#1E2338] text-slate-400 hover:text-white border border-[#2E3552]'
               }`}
             >
@@ -177,8 +190,10 @@ export const TaskManagerScreen: React.FC = () => {
       <div className="space-y-3">
         {filteredTasks.length === 0 ? (
           <GlassCard className="text-center py-12 space-y-3">
-            <AlertCircle className="w-10 h-10 text-slate-500 mx-auto" />
-            <p className="text-sm text-slate-300 font-semibold">No tasks found matching filters.</p>
+            <AlertCircle className="w-10 h-10 text-slate-400 mx-auto" />
+            <p className={`text-sm font-semibold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+              No tasks found matching filters.
+            </p>
             <NeonButton onClick={handleOpenNewModal} size="sm">
               <Plus className="w-4 h-4" /> Create First Task
             </NeonButton>
@@ -188,7 +203,11 @@ export const TaskManagerScreen: React.FC = () => {
             <GlassCard
               key={t.id}
               className={`transition-all ${
-                t.isCompleted ? 'opacity-60 bg-[#131726]/50' : 'hover:border-[#7C3AED]/60'
+                t.isCompleted
+                  ? isLight
+                    ? 'opacity-60 bg-slate-100/70'
+                    : 'opacity-60 bg-[#131726]/50'
+                  : 'hover:border-[#7C3AED]/60'
               }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -198,6 +217,8 @@ export const TaskManagerScreen: React.FC = () => {
                     className={`mt-1 w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
                       t.isCompleted
                         ? 'bg-[#00E676] border-[#00E676] text-black'
+                        : isLight
+                        ? 'border-purple-300 hover:border-[#7C3AED]'
                         : 'border-slate-500 hover:border-[#7C3AED]'
                     }`}
                   >
@@ -207,8 +228,12 @@ export const TaskManagerScreen: React.FC = () => {
                   <div className="space-y-1 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3
-                        className={`font-bold text-sm text-white ${
-                          t.isCompleted ? 'line-through text-slate-400' : ''
+                        className={`font-bold text-sm ${
+                          t.isCompleted
+                            ? 'line-through text-slate-400'
+                            : isLight
+                            ? 'text-slate-900'
+                            : 'text-white'
                         }`}
                       >
                         {t.title}
@@ -221,20 +246,26 @@ export const TaskManagerScreen: React.FC = () => {
                     </div>
 
                     {t.description && (
-                      <p className="text-xs text-slate-400 leading-relaxed">
+                      <p className={`text-xs leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
                         {t.description}
                       </p>
                     )}
 
                     <div className="flex items-center gap-2 pt-2 flex-wrap text-xs">
-                      <span className="px-2 py-0.5 text-[10px] font-semibold bg-[#1E2338] text-slate-300 rounded border border-[#2E3552]">
+                      <span
+                        className={`px-2 py-0.5 text-[10px] font-semibold rounded border ${
+                          isLight
+                            ? 'bg-purple-50 text-purple-900 border-purple-200'
+                            : 'bg-[#1E2338] text-slate-300 border-[#2E3552]'
+                        }`}
+                      >
                         {t.category}
                       </span>
                       <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${getPriorityStyle(t.priority)}`}>
                         {t.priority}
                       </span>
                       {getRevenueImpactBadge(t.revenueImpact)}
-                      <span className="text-[11px] text-slate-500">
+                      <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
                         ⏱️ {t.estimatedMinutes}m
                       </span>
                     </div>
@@ -244,14 +275,22 @@ export const TaskManagerScreen: React.FC = () => {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handleOpenEditModal(t)}
-                    className="p-2 text-slate-400 hover:text-white rounded-lg bg-[#0A0C14] border border-[#2E3552] transition-colors cursor-pointer"
+                    className={`p-2 rounded-lg border transition-colors cursor-pointer ${
+                      isLight
+                        ? 'bg-white border-purple-200 text-slate-600 hover:text-purple-700 hover:border-purple-300'
+                        : 'bg-[#0A0C14] border-[#2E3552] text-slate-400 hover:text-white'
+                    }`}
                     title="Edit Task"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => deleteTask(t.id)}
-                    className="p-2 text-slate-500 hover:text-red-400 rounded-lg bg-[#0A0C14] border border-[#2E3552] transition-colors cursor-pointer"
+                    className={`p-2 rounded-lg border transition-colors cursor-pointer ${
+                      isLight
+                        ? 'bg-white border-purple-200 text-slate-400 hover:text-red-500 hover:border-red-300'
+                        : 'bg-[#0A0C14] border-[#2E3552] text-slate-500 hover:text-red-400'
+                    }`}
                     title="Delete Task"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -265,15 +304,21 @@ export const TaskManagerScreen: React.FC = () => {
 
       {/* Add/Edit Task Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-md bg-[#0A0C14] border border-[#2E3552] rounded-3xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#2E3552] pb-3">
-              <h2 className="font-bold text-lg text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+          <div
+            className={`w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 border ${
+              isLight ? 'bg-white border-purple-300 text-slate-900' : 'bg-[#0A0C14] border-[#2E3552] text-white'
+            }`}
+          >
+            <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-purple-100' : 'border-[#2E3552]'}`}>
+              <h2 className="font-bold text-lg">
                 {editingTask.id ? 'Edit Priority Task' : 'Add New Priority Task'}
               </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-xl bg-[#131726] border border-[#2E3552] text-slate-400 hover:text-white cursor-pointer"
+                className={`p-2 rounded-xl border text-slate-400 hover:text-white cursor-pointer ${
+                  isLight ? 'bg-slate-100 border-purple-200 text-slate-600 hover:text-slate-900' : 'bg-[#131726] border-[#2E3552]'
+                }`}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -281,7 +326,7 @@ export const TaskManagerScreen: React.FC = () => {
 
             <form onSubmit={handleSaveModal} className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className={`block text-xs font-semibold mb-1 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                   Task Title
                 </label>
                 <input
@@ -290,12 +335,14 @@ export const TaskManagerScreen: React.FC = () => {
                   value={editingTask.title}
                   onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
                   placeholder="e.g. Pitch custom retainer proposal to client"
-                  className="w-full bg-[#131726] border border-[#2E3552] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-[#7C3AED]"
+                  className={`w-full rounded-xl px-3.5 py-2.5 text-sm border focus:outline-none focus:border-[#7C3AED] ${
+                    isLight ? 'bg-slate-50 border-purple-200 text-slate-900 placeholder-slate-400' : 'bg-[#131726] border-[#2E3552] text-white'
+                  }`}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className={`block text-xs font-semibold mb-1 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                   Description / Action Notes
                 </label>
                 <textarea
@@ -303,13 +350,15 @@ export const TaskManagerScreen: React.FC = () => {
                   value={editingTask.description}
                   onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
                   placeholder="Detailed execution steps or deliverables..."
-                  className="w-full bg-[#131726] border border-[#2E3552] rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-[#7C3AED]"
+                  className={`w-full rounded-xl px-3.5 py-2 text-xs border focus:outline-none focus:border-[#7C3AED] ${
+                    isLight ? 'bg-slate-50 border-purple-200 text-slate-900 placeholder-slate-400' : 'bg-[#131726] border-[#2E3552] text-white'
+                  }`}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className={`block text-xs font-semibold mb-1 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                     Category
                   </label>
                   <select
@@ -317,7 +366,9 @@ export const TaskManagerScreen: React.FC = () => {
                     onChange={(e) =>
                       setEditingTask({ ...editingTask, category: e.target.value as TaskCategory })
                     }
-                    className="w-full bg-[#131726] border border-[#2E3552] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-[#7C3AED]"
+                    className={`w-full rounded-xl px-3 py-2 text-xs border focus:outline-none focus:border-[#7C3AED] ${
+                      isLight ? 'bg-slate-50 border-purple-200 text-slate-900' : 'bg-[#131726] border-[#2E3552] text-white'
+                    }`}
                   >
                     <option value="MARKETING">MARKETING</option>
                     <option value="SALES">SALES</option>

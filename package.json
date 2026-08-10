@@ -13,6 +13,7 @@
     "@google/genai": "latest",
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "firebase": "^12.17.1",
     "lucide-react": "^0.469.0",
     "motion": "^12.4.1",
     "react": "^18.3.1",
