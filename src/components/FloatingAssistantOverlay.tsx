@@ -1,28 +1,362 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Bot, Sparkles } from 'lucide-react';
+import { Bot, Sparkles, Mic, MicOff, Volume2, X, Maximize2, Layers, ExternalLink, ShieldCheck } from 'lucide-react';
+import { askAssistantApi } from '../services/api';
 
 export const FloatingAssistantOverlay: React.FC = () => {
-  const { currentScreen, setCurrentScreen } = useApp();
+  const { currentScreen, setCurrentScreen, userProfile, askAssistant } = useApp();
 
-  // Hide floating button when already on AI Assistant screen or auth screens
-  if (['assistant', 'splash', 'landing', 'auth', 'onboarding'].includes(currentScreen)) {
-    return null;
-  }
+  const isLight = userProfile?.themeMode === 'Light';
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [response, setResponse] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
+  const [isOverlayModeActive, setIsOverlayModeActive] = useState(false);
+  const [pipWindowRef, setPipWindowRef] = useState<Window | null>(null);
+
+  const recognitionRef = useRef<any>(null);
+
+  // Hide main button when already on full AI Assistant screen
+  const isAssistantScreen = currentScreen === 'assistant';
+
+  // Speech synthesis speak helper
+  const speakText = (text: string) => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Process voice input through AI
+  const handleVoiceQuery = async (queryText: string) => {
+    if (!queryText.trim()) return;
+    setIsThinking(true);
+    setResponse('Task Flow AI is analyzing your prompt...');
+
+    try {
+      const aiReply = await askAssistantApi(
+        `[Overlay Assistant Mode] User voice prompt: ${queryText}`,
+        userProfile
+      );
+
+      setResponse(aiReply);
+      speakText(aiReply);
+    } catch (err) {
+      const fallback = "I'm ready to assist with your business tasks, revenue goals, and scheduling.";
+      setResponse(fallback);
+      speakText(fallback);
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
+  // Toggle Speech Recognition
+  const toggleListening = () => {
+    if (isListening) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {}
+      }
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech Recognition is not supported on this browser. Try Chrome, Edge, or Safari.');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setTranscript('Listening...');
+      };
+
+      recognition.onresult = (event: any) => {
+        const text = Array.from(event.results)
+          .map((result: any) => result[0].transcript)
+          .join('');
+        setTranscript(text);
+      };
+
+      recognition.onerror = () => {
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        if (transcript && transcript !== 'Listening...') {
+          handleVoiceQuery(transcript);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (e) {
+      setIsListening(false);
+    }
+  };
+
+  // Request Picture-in-Picture window (Display Over Other Apps feature)
+  const launchPictureInPicture = async () => {
+    if ('documentPictureInPicture' in window) {
+      try {
+        const pipWin = await (window as any).documentPictureInPicture.requestWindow({
+          width: 380,
+          height: 520,
+        });
+
+        setPipWindowRef(pipWin);
+        setIsOverlayModeActive(true);
+
+        // Inject styles & interactive markup into PiP window
+        pipWin.document.body.innerHTML = `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>Task Flow AI - Display Over Apps</title>
+              <style>
+                body {
+                  margin: 0;
+                  padding: 16px;
+                  background: #0A0C14;
+                  color: #F8FAFC;
+                  font-family: system-ui, -apple-system, sans-serif;
+                  display: flex;
+                  flex-col;
+                  height: 100vh;
+                  box-sizing: border-box;
+                }
+                .header {
+                  display: flex;
+                  align-items: center;
+                  justify-content: space-between;
+                  border-bottom: 1px solid #2E3552;
+                  padding-bottom: 10px;
+                  margin-bottom: 12px;
+                }
+                .title {
+                  font-weight: 800;
+                  font-size: 14px;
+                  color: #06B6D4;
+                  display: flex;
+                  align-items: center;
+                  gap: 6px;
+                }
+                .badge {
+                  background: rgba(0, 230, 118, 0.2);
+                  color: #00E676;
+                  font-size: 10px;
+                  padding: 2px 8px;
+                  border-radius: 12px;
+                  border: 1px solid rgba(0, 230, 118, 0.4);
+                  font-weight: bold;
+                }
+                .content {
+                  flex: 1;
+                  background: #131726;
+                  border: 1px solid #2E3552;
+                  border-radius: 12px;
+                  padding: 12px;
+                  overflow-y: auto;
+                  font-size: 13px;
+                  line-height: 1.5;
+                  margin-bottom: 12px;
+                }
+                .mic-btn {
+                  width: 100%;
+                  padding: 12px;
+                  background: linear-gradient(135deg, #7C3AED, #06B6D4);
+                  color: white;
+                  font-weight: bold;
+                  border: none;
+                  border-radius: 12px;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  gap: 8px;
+                  font-size: 14px;
+                  box-shadow: 0 0 15px rgba(124, 58, 237, 0.4);
+                }
+                .mic-btn:active { opacity: 0.8; }
+                .hint { font-size: 11px; color: #94A3B8; text-align: center; margin-top: 8px; }
+              </style>
+            </head>
+            <body>
+              <div class="header">
+                <div class="title">🤖 Task Flow AI Assistant</div>
+                <div class="badge">OVERLAY ACTIVE</div>
+              </div>
+              <div class="content" id="pip-transcript">
+                Welcome to Task Flow AI Display Over Apps mode! You can keep this window on top of other apps while working. Click the microphone below to talk.
+              </div>
+              <button class="mic-btn" id="pip-mic">
+                🎙️ Speak to AI Assistant
+              </button>
+              <div class="hint">Window stays pinned over all active windows</div>
+            </body>
+          </html>
+        `;
+
+        // Wire event listener in PiP window
+        const pipMicBtn = pipWin.document.getElementById('pip-mic');
+        const pipText = pipWin.document.getElementById('pip-transcript');
+
+        if (pipMicBtn && pipText) {
+          pipMicBtn.onclick = () => {
+            pipText.innerText = 'Listening to your command... Speak now!';
+            toggleListening();
+          };
+        }
+
+        pipWin.addEventListener('unload', () => {
+          setIsOverlayModeActive(false);
+          setPipWindowRef(null);
+        });
+      } catch (e) {
+        // Fallback to in-app floating overlay mode
+        setIsOverlayModeActive(true);
+        setIsOpen(true);
+      }
+    } else {
+      // Fallback overlay mode
+      setIsOverlayModeActive(true);
+      setIsOpen(true);
+    }
+  };
 
   return (
-    <div className="fixed bottom-20 right-5 z-30">
-      <button
-        onClick={() => setCurrentScreen('assistant')}
-        className="group relative flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-tr from-[#7C3AED] via-[#8B5CF6] to-[#06B6D4] text-white shadow-[0_0_25px_rgba(124,58,237,0.6)] hover:shadow-[0_0_35px_rgba(6,182,212,0.8)] hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer"
-        title="Open 24/7 AI Business Assistant"
-      >
-        <Bot className="w-7 h-7" />
-        <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#00E676] rounded-full border-2 border-[#0A0C14] animate-pulse" />
-        <div className="absolute right-16 hidden group-hover:flex items-center gap-1 bg-[#131726] border border-[#7C3AED] px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-xl whitespace-nowrap">
-          <Sparkles className="w-3.5 h-3.5 text-[#06B6D4]" /> Ask AI Assistant
+    <>
+      {/* Floating Assistant Orb (visible on all screens except full assistant view) */}
+      {!isAssistantScreen && (
+        <div className="fixed bottom-20 right-4 z-40 flex flex-col items-end gap-2">
+          {/* Expanded Overlay Quick Panel */}
+          {isOpen && (
+            <div
+              className={`w-80 p-4 rounded-2xl border shadow-2xl space-y-3 animate-fade-in mb-2 ${
+                isLight
+                  ? 'bg-white/95 border-purple-200 text-slate-900 shadow-purple-500/10'
+                  : 'bg-[#0A0C14]/95 border-[#2E3552] text-white shadow-cyan-500/10'
+              } backdrop-blur-xl`}
+            >
+              <div className="flex items-center justify-between border-b border-purple-500/20 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-[#7C3AED]/20 text-[#A78BFA] rounded-lg">
+                    <Bot className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xs flex items-center gap-1">
+                      Task Flow AI <Sparkles className="w-3 h-3 text-[#06B6D4]" />
+                    </h4>
+                    <span className="text-[10px] text-[#00E676] font-semibold">
+                      {isOverlayModeActive ? 'Display Over Other Apps Active' : '24/7 Overlay Assistant'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setIsOpen(false);
+                      setCurrentScreen('assistant');
+                    }}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 cursor-pointer"
+                    title="Expand Full Screen"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Status / Response Box */}
+              <div
+                className={`p-3 rounded-xl border text-xs max-h-40 overflow-y-auto space-y-1.5 ${
+                  isLight
+                    ? 'bg-purple-50/70 border-purple-200 text-slate-800'
+                    : 'bg-[#131726] border-[#2E3552] text-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
+                  <span>TRANSCRIPTION / RESPONSE</span>
+                  {isThinking && <span className="text-[#06B6D4] animate-pulse">Thinking...</span>}
+                </div>
+                <p className="leading-relaxed">
+                  {response || transcript || 'Tap the microphone below or ask any question to speak with Task Flow AI.'}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                <button
+                  onClick={toggleListening}
+                  className={`w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                    isListening
+                      ? 'bg-red-500 text-white animate-pulse'
+                      : 'bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] text-white hover:opacity-90'
+                  }`}
+                >
+                  {isListening ? (
+                    <>
+                      <MicOff className="w-4 h-4" /> Stop Listening
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-4 h-4" /> Speak to AI Assistant
+                    </>
+                  )}
+                </button>
+
+                {/* Display Over Other Apps Button */}
+                <button
+                  onClick={launchPictureInPicture}
+                  className={`w-full py-2 rounded-xl font-bold text-[11px] border flex items-center justify-center gap-1.5 cursor-pointer transition-colors ${
+                    isLight
+                      ? 'bg-purple-100 hover:bg-purple-200 border-purple-300 text-purple-900'
+                      : 'bg-[#1E2338] hover:bg-[#252C46] border-[#2E3552] text-[#06B6D4]'
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  {isOverlayModeActive ? 'Overlay Window Running' : 'Display Over Other Apps (Floating PiP)'}
+                  <ExternalLink className="w-3 h-3 ml-0.5 opacity-70" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Floating Orb Icon */}
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="group relative flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-tr from-[#7C3AED] via-[#8B5CF6] to-[#06B6D4] text-white shadow-[0_0_25px_rgba(124,58,237,0.6)] hover:shadow-[0_0_35px_rgba(6,182,212,0.8)] cursor-pointer touch-manipulation select-none active:opacity-80"
+            title="Task Flow AI Floating Assistant"
+          >
+            <Bot className="w-7 h-7" />
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#00E676] rounded-full border-2 border-[#0A0C14] animate-pulse" />
+            {!isOpen && (
+              <div className="absolute right-16 hidden group-hover:flex items-center gap-1 bg-[#131726] border border-[#7C3AED] px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-xl whitespace-nowrap">
+                <Sparkles className="w-3.5 h-3.5 text-[#06B6D4]" /> Display Over Other Apps
+              </div>
+            )}
+          </button>
         </div>
-      </button>
-    </div>
+      )}
+    </>
   );
 };

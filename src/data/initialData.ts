@@ -120,7 +120,7 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [
   {
     id: 'notif_1',
     title: 'Welcome to TaskFlow AI!',
-    message: 'Your Spectrey workspace is synced and ready. Tap to explore Daily AI Planner.',
+    message: 'Your Task Flow workspace is synced and ready. Tap to explore Daily AI Planner.',
     timestamp: 'Just now',
     category: 'SYSTEM',
     isRead: false,

@@ -141,8 +141,10 @@ export const ProfileSettingsScreen: React.FC = () => {
             onClick={() => toggleThemeMode('Light')}
             className={`p-3.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               userProfile.themeMode === 'Light'
-                ? 'bg-amber-500/10 border-amber-500 text-amber-600 shadow-sm'
-                : 'bg-slate-100 dark:bg-[#0A0C14] border-slate-300 dark:border-[#2E3552]'
+                ? 'bg-amber-500/15 border-amber-500 text-amber-700 dark:text-amber-400 font-extrabold shadow-sm'
+                : isLight
+                ? 'bg-slate-100 border-slate-300 text-slate-700 hover:text-slate-900'
+                : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white'
             }`}
           >
             <Sun className="w-4 h-4 text-amber-500" /> Light Mode
@@ -152,8 +154,10 @@ export const ProfileSettingsScreen: React.FC = () => {
             onClick={() => toggleThemeMode('Dark')}
             className={`p-3.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
               userProfile.themeMode === 'Dark'
-                ? 'bg-[#7C3AED]/20 border-[#7C3AED] text-[#A78BFA] shadow-sm'
-                : 'bg-slate-100 dark:bg-[#0A0C14] border-slate-300 dark:border-[#2E3552]'
+                ? 'bg-[#7C3AED]/25 border-[#7C3AED] text-[#A78BFA] font-extrabold shadow-sm'
+                : isLight
+                ? 'bg-slate-100 border-slate-300 text-slate-700 hover:text-slate-900'
+                : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white'
             }`}
           >
             <Moon className="w-4 h-4 text-indigo-400" /> Dark Mode

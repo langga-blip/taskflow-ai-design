@@ -16,6 +16,7 @@ import {
 
 export const QuickNavPopupMenu: React.FC = () => {
   const { isQuickNavOpen, setIsQuickNavOpen, setCurrentScreen, userProfile } = useApp();
+  const isLight = userProfile?.themeMode === 'Light';
 
   if (!isQuickNavOpen) return null;
 
@@ -84,12 +85,28 @@ export const QuickNavPopupMenu: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-      <div className="w-full max-w-lg bg-[#0A0C14] border border-[#2E3552] rounded-3xl p-6 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b border-[#2E3552] pb-3">
-          <h2 className="font-bold text-lg text-white">Quick Navigation</h2>
+      <div
+        className={`w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4 border transition-colors ${
+          isLight
+            ? 'bg-white border-purple-300 text-slate-900'
+            : 'bg-[#0A0C14] border-[#2E3552] text-white'
+        }`}
+      >
+        <div
+          className={`flex items-center justify-between pb-3 border-b ${
+            isLight ? 'border-purple-200' : 'border-[#2E3552]'
+          }`}
+        >
+          <h2 className={`font-bold text-lg ${isLight ? 'text-slate-900' : 'text-white'}`}>
+            Quick Navigation
+          </h2>
           <button
             onClick={() => setIsQuickNavOpen(false)}
-            className="p-2 rounded-xl bg-[#131726] border border-[#2E3552] text-slate-400 hover:text-white cursor-pointer"
+            className={`p-2 rounded-xl border cursor-pointer ${
+              isLight
+                ? 'bg-slate-100 border-slate-300 text-slate-600 hover:text-slate-900'
+                : 'bg-[#131726] border-[#2E3552] text-slate-400 hover:text-white'
+            }`}
           >
             <X className="w-5 h-5" />
           </button>
@@ -100,14 +117,28 @@ export const QuickNavPopupMenu: React.FC = () => {
             <button
               key={r.id}
               onClick={() => handleNav(r.id)}
-              className="flex items-start gap-3 p-3 bg-[#131726] hover:bg-[#1E2338] border border-[#2E3552] hover:border-[#7C3AED]/50 rounded-2xl transition-all text-left cursor-pointer group"
+              className={`flex items-start gap-3 p-3 rounded-2xl transition-all text-left cursor-pointer group border ${
+                isLight
+                  ? 'bg-purple-50/60 hover:bg-purple-100/90 border-purple-200 hover:border-purple-400'
+                  : 'bg-[#131726] hover:bg-[#1E2338] border-[#2E3552] hover:border-[#7C3AED]/50'
+              }`}
             >
-              <div className="p-2 bg-[#0A0C14] rounded-xl border border-[#2E3552] group-hover:scale-110 transition-transform">
+              <div
+                className={`p-2 rounded-xl border group-hover:scale-110 transition-transform ${
+                  isLight
+                    ? 'bg-white border-purple-200'
+                    : 'bg-[#0A0C14] border-[#2E3552]'
+                }`}
+              >
                 {r.icon}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-white group-hover:text-[#06B6D4] truncate">
+                  <span
+                    className={`font-bold text-xs truncate ${
+                      isLight ? 'text-slate-900 group-hover:text-purple-700' : 'text-white group-hover:text-[#06B6D4]'
+                    }`}
+                  >
                     {r.name}
                   </span>
                   {r.badge && (
@@ -116,7 +147,9 @@ export const QuickNavPopupMenu: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-slate-400 truncate mt-0.5">{r.desc}</p>
+                <p className={`text-[11px] truncate mt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                  {r.desc}
+                </p>
               </div>
             </button>
           ))}

@@ -87,24 +87,63 @@ export const TaskManagerScreen: React.FC = () => {
   const getPriorityStyle = (priority: TaskPriority) => {
     switch (priority) {
       case 'URGENT':
-        return 'bg-red-500/20 text-red-400 border-red-500/30';
+        return isLight
+          ? 'bg-red-100 text-red-800 border-red-300 font-bold'
+          : 'bg-red-500/20 text-red-400 border-red-500/40';
       case 'HIGH':
-        return 'bg-[#7C3AED]/20 text-[#A78BFA] border-[#7C3AED]/30';
+        return isLight
+          ? 'bg-purple-100 text-purple-900 border-purple-300 font-bold'
+          : 'bg-purple-600/20 text-purple-300 border-purple-500/40';
       case 'MEDIUM':
-        return 'bg-[#2563EB]/20 text-[#60A5FA] border-[#2563EB]/30';
+        return isLight
+          ? 'bg-blue-100 text-blue-900 border-blue-300 font-bold'
+          : 'bg-blue-500/20 text-blue-400 border-blue-500/40';
+      case 'LOW':
       default:
-        return 'bg-slate-500/20 text-slate-300 border-slate-500/30';
+        return isLight
+          ? 'bg-amber-100 text-amber-900 border-amber-300 font-bold'
+          : 'bg-amber-400/20 text-amber-300 border-amber-400/40';
     }
   };
 
   const getRevenueImpactBadge = (impact: RevenueImpact) => {
     switch (impact) {
       case 'HIGH':
-        return <span className="px-2 py-0.5 text-[10px] font-extrabold bg-[#F59E0B]/20 text-[#F59E0B] rounded border border-[#F59E0B]/30">$$$ High Impact</span>;
+        return (
+          <span
+            className={`px-2 py-0.5 text-[10px] font-extrabold rounded border ${
+              isLight
+                ? 'bg-amber-100 text-amber-950 border-amber-300'
+                : 'bg-[#F59E0B]/20 text-[#F59E0B] border-[#F59E0B]/30'
+            }`}
+          >
+            $$$ High Impact
+          </span>
+        );
       case 'MEDIUM':
-        return <span className="px-2 py-0.5 text-[10px] font-bold bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/30">$$ Med Impact</span>;
+        return (
+          <span
+            className={`px-2 py-0.5 text-[10px] font-bold rounded border ${
+              isLight
+                ? 'bg-cyan-100 text-cyan-950 border-cyan-300'
+                : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+            }`}
+          >
+            $$ Med Impact
+          </span>
+        );
       default:
-        return <span className="px-2 py-0.5 text-[10px] font-medium bg-slate-500/20 text-slate-400 rounded border border-slate-500/30">$ Standard</span>;
+        return (
+          <span
+            className={`px-2 py-0.5 text-[10px] font-semibold rounded border ${
+              isLight
+                ? 'bg-slate-200 text-slate-800 border-slate-300'
+                : 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+            }`}
+          >
+            $ Standard
+          </span>
+        );
     }
   };
 

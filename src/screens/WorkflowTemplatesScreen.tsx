@@ -169,24 +169,26 @@ export const WorkflowTemplatesScreen: React.FC = () => {
 
       {/* Workflow Steps Preview Modal */}
       {selectedTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 pb-24 sm:pb-6 bg-black/80 backdrop-blur-md animate-fade-in">
           <div
-            className={`w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4 border ${
+            className={`w-full max-w-lg rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col max-h-[68vh] sm:max-h-[78vh] border relative ${
               isLight ? 'bg-white border-purple-300 text-slate-900' : 'bg-[#0A0C14] border-[#2E3552] text-white'
             }`}
           >
-            <div className={`flex items-center justify-between pb-3 border-b ${isLight ? 'border-purple-100' : 'border-[#2E3552]'}`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between pb-2 mb-2 border-b shrink-0 ${isLight ? 'border-purple-100' : 'border-[#2E3552]'}`}>
               <div>
-                <span className={`text-[10px] font-bold ${isLight ? 'text-purple-700' : 'text-[#06B6D4]'}`}>
+                <span className={`text-[10px] font-bold tracking-wider uppercase ${isLight ? 'text-purple-700' : 'text-[#06B6D4]'}`}>
                   {selectedTemplate.category}
                 </span>
-                <h2 className={`font-bold text-lg ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                <h2 className={`font-bold text-base sm:text-lg ${isLight ? 'text-slate-900' : 'text-white'}`}>
                   {selectedTemplate.title}
                 </h2>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedTemplate(null)}
-                className={`p-2 rounded-xl border cursor-pointer ${
+                className={`p-1.5 sm:p-2 rounded-xl border cursor-pointer transition-colors ${
                   isLight ? 'bg-slate-100 border-purple-200 text-slate-600 hover:text-slate-900' : 'bg-[#131726] border-[#2E3552] text-slate-400 hover:text-white'
                 }`}
               >
@@ -194,51 +196,65 @@ export const WorkflowTemplatesScreen: React.FC = () => {
               </button>
             </div>
 
-            <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+            <p className={`text-xs mb-2 shrink-0 leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
               {selectedTemplate.description}
             </p>
 
-            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-              <h4 className={`text-xs font-bold ${isLight ? 'text-purple-900' : 'text-purple-300'}`}>
+            {/* Scrollable Steps List */}
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 my-1 pb-2">
+              <h4 className={`text-xs font-bold sticky top-0 py-1.5 backdrop-blur-md z-10 ${isLight ? 'text-purple-900 bg-white/95' : 'text-purple-300 bg-[#0A0C14]/95'}`}>
                 Included Automation Steps ({selectedTemplate.tasks.length}):
               </h4>
-              {selectedTemplate.tasks.map((task, idx) => (
-                <div
-                  key={idx}
-                  className={`p-3 rounded-xl border text-xs space-y-1 ${
-                    isLight ? 'bg-purple-50/50 border-purple-200' : 'bg-[#131726] border-[#2E3552]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className={`font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>
-                      {idx + 1}. {task.title}
-                    </span>
-                    <span className="text-[10px] text-purple-600 font-semibold">{task.estimatedMinutes}m</span>
+              {selectedTemplate.tasks.map((task, idx) => {
+                const stepText = typeof task === 'string' ? task : (task as any).title || String(task);
+                return (
+                  <div
+                    key={idx}
+                    className={`p-2.5 sm:p-3 rounded-xl border text-xs transition-colors ${
+                      isLight
+                        ? 'bg-purple-50/70 border-purple-200 text-slate-800'
+                        : 'bg-[#131726] border-[#2E3552] text-slate-200 hover:border-[#7C3AED]/50'
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-[#7C3AED]/20 text-[#A78BFA] text-[10px] font-extrabold flex items-center justify-center border border-[#7C3AED]/40 mt-0.5">
+                        {idx + 1}
+                      </span>
+                      <div className="flex-1 space-y-0.5">
+                        <p className={`font-semibold leading-snug text-xs sm:text-sm ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                          {stepText}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-medium">
+                          Step {idx + 1} of {selectedTemplate.tasks.length} • Actionable Execution Task
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  {task.description && (
-                    <p className={`text-[11px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{task.description}</p>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            {/* Fixed Bottom Action Buttons */}
+            <div className={`flex items-center justify-end gap-2 pt-2.5 mt-2 border-t shrink-0 bg-inherit rounded-b-3xl ${isLight ? 'border-purple-100' : 'border-[#2E3552]'}`}>
               <button
+                type="button"
                 onClick={() => setSelectedTemplate(null)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer ${
-                  isLight ? 'bg-slate-100 text-slate-700' : 'bg-[#131726] text-slate-300'
+                className={`px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                  isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-[#131726] hover:bg-[#1E2338] text-slate-300'
                 }`}
               >
                 Close
               </button>
               <button
+                type="button"
                 onClick={() => {
                   handleAddWorkflow(selectedTemplate);
                   setSelectedTemplate(null);
                 }}
-                className="px-4 py-2 rounded-xl bg-[#7C3AED] hover:bg-[#8B5CF6] text-white text-xs font-bold cursor-pointer shadow-md"
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] text-white text-xs sm:text-sm font-extrabold cursor-pointer shadow-lg hover:brightness-110 flex items-center gap-1.5 transition-all"
               >
-                Activate All Steps
+                <Check className="w-4 h-4" />
+                <span>Activate All Steps</span>
               </button>
             </div>
           </div>

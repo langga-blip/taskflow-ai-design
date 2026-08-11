@@ -46,7 +46,7 @@ export const SubscriptionScreen: React.FC = () => {
         <div className={`flex items-center justify-between pb-4 border-b ${isLight ? 'border-amber-200' : 'border-[#2E3552]'}`}>
           <div>
             <span className="text-[10px] font-extrabold text-[#F59E0B] uppercase tracking-wider">
-              SPECTREY PRO ANNUAL
+              TASK FLOW PRO ANNUAL
             </span>
             <h2 className={`text-2xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>$199 / Year</h2>
             <p className={`text-[11px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Equivalent to $16.50/month (Save 40%)</p>

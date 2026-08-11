@@ -89,24 +89,33 @@ export const RevenueDashboardScreen: React.FC = () => {
 
   const handleSaveGoal = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newTargetGoal <= 0) return;
+    const parsed = typeof newTargetGoal === 'string' ? parseFloat(newTargetGoal) : newTargetGoal;
+    if (isNaN(parsed) || parsed <= 0) return;
 
-    updateUserProfile({ monthlyRevenueGoal: Number(newTargetGoal) });
-    triggerNotification('Revenue Goal Updated', `Monthly target set to ${formatRevenue(newTargetGoal, false)}.`, 'SYSTEM');
+    updateUserProfile({ monthlyRevenueGoal: parsed });
+    triggerNotification('Revenue Goal Updated', `Monthly target set to ${formatRevenue(parsed, false)}.`, 'SYSTEM');
     setIsEditGoalOpen(false);
   };
 
   return (
     <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in overflow-x-hidden max-w-full">
       {/* Header Banner */}
-      <GlassCard className="border-[#00E676]/40 bg-gradient-to-br from-[#131726] via-[#131726] to-[#1E2338]">
+      <GlassCard className={`border ${
+        isLight
+          ? 'bg-gradient-to-br from-emerald-50/80 via-white to-emerald-100/40 border-emerald-200 text-slate-900 shadow-sm'
+          : 'border-[#00E676]/40 bg-gradient-to-br from-[#131726] via-[#131726] to-[#1E2338] text-white'
+      }`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#00E676]/20 text-[#00E676] text-xs font-bold border border-[#00E676]/30">
-              <TrendingUp className="w-3.5 h-3.5" /> Spectrey Global Revenue Engine
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+              isLight
+                ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                : 'bg-[#00E676]/20 text-[#00E676] border-[#00E676]/30'
+            }`}>
+              <TrendingUp className="w-3.5 h-3.5" /> Task Flow Global Revenue Engine
             </div>
-            <h1 className="text-2xl font-extrabold text-white">Revenue & Goal Dashboard</h1>
-            <p className="text-xs text-slate-400">
+            <h1 className={`text-2xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>Revenue & Goal Dashboard</h1>
+            <p className={`text-xs ${isLight ? 'text-slate-600 font-medium' : 'text-slate-400'}`}>
               Track monthly recurring income, currency conversions & target milestones
             </p>
           </div>
@@ -114,7 +123,11 @@ export const RevenueDashboardScreen: React.FC = () => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsCurrencyModalOpen(true)}
-              className="px-3 py-2 rounded-xl bg-[#0A0C14] border border-[#2E3552] hover:border-[#06B6D4] text-xs font-bold text-[#06B6D4] flex items-center gap-1.5 transition-colors cursor-pointer"
+              className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                isLight
+                  ? 'bg-cyan-50 border-cyan-300 text-cyan-900 hover:bg-cyan-100'
+                  : 'bg-[#0A0C14] border-[#2E3552] text-[#06B6D4] hover:border-[#06B6D4]'
+              }`}
             >
               <Globe className="w-4 h-4" /> {userProfile.currencyCode} ({userProfile.currencySymbol})
             </button>
@@ -127,16 +140,20 @@ export const RevenueDashboardScreen: React.FC = () => {
 
       {/* Hero Revenue Tracker */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <GlassCard className="sm:col-span-2 space-y-4 border-[#00E676]/30">
+        <GlassCard className={`sm:col-span-2 space-y-4 border ${
+          isLight ? 'bg-white border-purple-200 text-slate-900' : 'border-[#00E676]/30 bg-[#131726] text-white'
+        }`}>
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Current Monthly Revenue</span>
+            <span className={`text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>Current Monthly Revenue</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   setNewCurrentRevenue(currentRev);
                   setIsEditRevenueOpen(true);
                 }}
-                className="text-xs font-bold text-[#00E676] hover:underline flex items-center gap-1 cursor-pointer"
+                className={`text-xs font-bold flex items-center gap-1 cursor-pointer hover:underline ${
+                  isLight ? 'text-emerald-700' : 'text-[#00E676]'
+                }`}
               >
                 <Edit2 className="w-3.5 h-3.5" /> Edit Revenue
               </button>
@@ -145,7 +162,9 @@ export const RevenueDashboardScreen: React.FC = () => {
                   setNewTargetGoal(revGoal);
                   setIsEditGoalOpen(true);
                 }}
-                className="text-xs font-bold text-[#06B6D4] hover:underline flex items-center gap-1 cursor-pointer"
+                className={`text-xs font-bold flex items-center gap-1 cursor-pointer hover:underline ${
+                  isLight ? 'text-cyan-800' : 'text-[#06B6D4]'
+                }`}
               >
                 <Edit2 className="w-3.5 h-3.5" /> Edit Target
               </button>
@@ -156,20 +175,22 @@ export const RevenueDashboardScreen: React.FC = () => {
             <h2 className={`text-3xl sm:text-4xl font-extrabold tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
               {formatRevenue(currentRev)}
             </h2>
-            <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-              Target Goal: <span className={`font-bold ${isLight ? 'text-slate-900' : 'text-white'}`}>{formatRevenue(revGoal, false)}</span>
+            <p className={`text-xs ${isLight ? 'text-slate-600 font-medium' : 'text-slate-400'}`}>
+              Target Goal: <span className={`font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>{formatRevenue(revGoal, false)}</span>
             </p>
           </div>
 
           {/* Progress Bar */}
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs font-bold">
-              <span className="text-[#00E676]">{percentAchieved}% Achieved</span>
-              <span className="text-slate-400">
+              <span className={isLight ? 'text-emerald-800 font-extrabold' : 'text-[#00E676]'}>{percentAchieved}% Achieved</span>
+              <span className={isLight ? 'text-slate-600' : 'text-slate-400'}>
                 {formatRevenue(Math.max(0, revGoal - currentRev), false)} Needed
               </span>
             </div>
-            <div className="w-full h-3.5 bg-[#0A0C14] rounded-full overflow-hidden p-0.5 border border-[#2E3552]">
+            <div className={`w-full h-3.5 rounded-full overflow-hidden p-0.5 border ${
+              isLight ? 'bg-slate-200 border-slate-300' : 'bg-[#0A0C14] border-[#2E3552]'
+            }`}>
               <div
                 className="h-full bg-gradient-to-r from-[#7C3AED] via-[#06B6D4] to-[#00E676] rounded-full transition-all duration-500 shadow-[0_0_15px_rgba(0,230,118,0.5)]"
                 style={{ width: `${percentAchieved}%` }}
@@ -178,20 +199,26 @@ export const RevenueDashboardScreen: React.FC = () => {
           </div>
         </GlassCard>
 
-        <GlassCard className="space-y-3 flex flex-col justify-between">
+        <GlassCard className={`space-y-3 flex flex-col justify-between border ${
+          isLight ? 'bg-white border-purple-200 text-slate-900' : 'border-[#2E3552] bg-[#131726] text-white'
+        }`}>
           <div className="space-y-1">
-            <span className="text-xs font-semibold text-slate-400">Active Currency Rate</span>
-            <h3 className="text-xl font-bold text-white flex items-center gap-1.5 mt-1">
+            <span className={`text-xs font-bold ${isLight ? 'text-slate-700' : 'text-slate-400'}`}>Active Currency Rate</span>
+            <h3 className={`text-xl font-bold flex items-center gap-1.5 mt-1 ${isLight ? 'text-slate-900' : 'text-white'}`}>
               <Globe className="w-5 h-5 text-[#06B6D4]" /> {userProfile.currencyCode}
             </h3>
-            <p className="text-[11px] text-slate-400">
+            <p className={`text-[11px] ${isLight ? 'text-slate-600 font-medium' : 'text-slate-400'}`}>
               1 USD = {(exchangeRates[userProfile.currencyCode.toUpperCase()] || 1.0).toLocaleString()} {userProfile.currencyCode}
             </p>
           </div>
 
           <button
             onClick={refreshExchangeRates}
-            className="w-full py-2 bg-[#0A0C14] border border-[#2E3552] hover:border-[#06B6D4] text-xs font-bold text-slate-300 hover:text-white rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            className={`w-full py-2 border rounded-xl flex items-center justify-center gap-1.5 transition-colors cursor-pointer text-xs font-bold ${
+              isLight
+                ? 'bg-purple-50 border-purple-300 text-purple-900 hover:bg-purple-100'
+                : 'bg-[#0A0C14] border-[#2E3552] text-slate-300 hover:text-white hover:border-[#06B6D4]'
+            }`}
           >
             <RefreshCw className="w-3.5 h-3.5" /> Sync Rates
           </button>

@@ -54,10 +54,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
 
   return (
     <header
-      className={`sticky top-0 z-40 backdrop-blur-xl border-b transition-colors px-4 py-3 ${
+      className={`w-full backdrop-blur-xl border-b transition-colors px-4 py-3 ${
         isLight
-          ? 'bg-white/80 border-slate-200 text-slate-800'
-          : 'bg-[#0A0C14]/80 border-[#2E3552] text-slate-200'
+          ? 'bg-white/90 border-slate-200 text-slate-800'
+          : 'bg-[#0A0C14]/90 border-[#2E3552] text-slate-200'
       }`}
     >
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-2 w-full overflow-hidden">
@@ -118,26 +118,36 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
         </div>
 
         {/* Action Controls - Horizontally Swipeable Icon Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 px-1.5 touch-pan-x ml-auto w-[170px] xs:w-[205px] sm:w-auto max-w-[170px] xs:max-w-[205px] sm:max-w-none flex-nowrap shrink-0 scroll-smooth rounded-xl border border-[#2E3552]/50 bg-[#131726]/60 sm:bg-transparent sm:border-none sm:p-0 shadow-inner">
+        <div
+          className={`flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none py-1 px-1.5 touch-pan-x ml-auto shrink-0 flex-nowrap rounded-xl border sm:bg-transparent sm:border-none sm:p-0 shadow-inner w-[170px] xs:w-[205px] sm:w-auto max-w-[170px] xs:max-w-[205px] sm:max-w-none ${
+            isLight
+              ? 'border-purple-200/80 bg-purple-100/70 text-purple-950'
+              : 'border-[#2E3552]/50 bg-[#131726]/80 text-slate-200'
+          }`}
+        >
           {/* 1. Light / Dark Mode Toggle Button */}
           <button
             type="button"
             onClick={toggleTheme}
-            className={`p-2 rounded-xl border transition-colors cursor-pointer flex-shrink-0 ${
+            className={`p-2 rounded-xl border cursor-pointer flex-shrink-0 active:scale-95 active:opacity-75 touch-manipulation select-none transition-all duration-75 ${
               isLight
-                ? 'bg-slate-100 border-slate-300 text-amber-600 hover:bg-slate-200'
-                : 'bg-[#131726] border-[#2E3552] text-amber-300 hover:text-white hover:border-[#7C3AED]/50'
+                ? 'bg-purple-100 border-purple-300 text-purple-700 hover:bg-purple-200'
+                : 'bg-[#131726] border-[#2E3552] text-amber-400 hover:text-white hover:border-[#7C3AED]/50'
             }`}
             title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
           >
-            {isLight ? <Moon className="w-4 h-4 sm:w-5 sm:h-5" /> : <Sun className="w-4 h-4 sm:w-5 sm:h-5" />}
+            {isLight ? (
+              <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-purple-700" />
+            ) : (
+              <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+            )}
           </button>
 
           {/* 2. Quick Nav Popup Button */}
           <button
             type="button"
             onClick={() => setIsQuickNavOpen(true)}
-            className={`p-2 rounded-xl border transition-colors cursor-pointer flex-shrink-0 ${
+            className={`p-2 rounded-xl border cursor-pointer flex-shrink-0 active:scale-95 active:opacity-75 touch-manipulation select-none transition-all duration-75 ${
               isLight
                 ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
                 : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white hover:border-[#7C3AED]/50'
@@ -151,7 +161,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
           <button
             type="button"
             onClick={() => setIsVoiceSheetOpen(true)}
-            className={`p-2 rounded-xl border transition-colors cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.15)] flex-shrink-0 ${
+            className={`p-2 rounded-xl border cursor-pointer shadow-[0_0_10px_rgba(6,182,212,0.15)] flex-shrink-0 active:scale-95 active:opacity-75 touch-manipulation select-none transition-all duration-75 ${
               isLight
                 ? 'bg-slate-100 border-slate-300 text-[#06B6D4] hover:bg-slate-200'
                 : 'bg-[#131726] border-[#2E3552] text-[#06B6D4] hover:border-[#06B6D4]/50'
@@ -165,7 +175,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
           <button
             type="button"
             onClick={() => setIsNotificationSheetOpen(true)}
-            className={`relative p-2 rounded-xl border transition-colors cursor-pointer flex-shrink-0 ${
+            className={`relative p-2 rounded-xl border cursor-pointer flex-shrink-0 active:scale-95 active:opacity-75 touch-manipulation select-none transition-all duration-75 ${
               isLight
                 ? 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200'
                 : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white hover:border-[#7C3AED]/50'
@@ -174,7 +184,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
           >
             <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-[#EF4444] text-white font-bold text-[9px] sm:text-[10px] rounded-full flex items-center justify-center animate-pulse border border-[#0A0C14]">
+              <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-[#EF4444] text-white font-bold text-[9px] sm:text-[10px] rounded-full flex items-center justify-center border border-[#0A0C14]">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
@@ -184,7 +194,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
           <button
             type="button"
             onClick={() => setCurrentScreen('profile')}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] p-0.5 cursor-pointer hover:scale-105 transition-transform flex-shrink-0"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] p-0.5 cursor-pointer active:scale-95 active:opacity-75 touch-manipulation select-none flex-shrink-0 transition-all duration-75"
             title="Profile & Settings"
           >
             <div

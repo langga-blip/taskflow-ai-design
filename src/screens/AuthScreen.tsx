@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { NeonButton } from '../components/NeonButton';
 import { SearchableCountrySelector } from '../components/SearchableCountrySelector';
+import { signInWithGoogle } from '../lib/firebase';
 import {
   COUNTRIES_DATA,
   CountryData,
@@ -24,6 +25,8 @@ import {
   ShieldCheck,
   Sun,
   Moon,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 export const AuthScreen: React.FC = () => {
@@ -34,12 +37,18 @@ export const AuthScreen: React.FC = () => {
   // Toggle mode
   const [isRegister, setIsRegister] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [isSigningInGoogle, setIsSigningInGoogle] = useState(false);
 
   // Registration & Login Form State
   const [name, setName] = useState('Alex Rivera');
   const [email, setEmail] = useState('alex@apexscale.com');
-  const [password, setPassword] = useState('••••••••••••');
+  const [password, setPassword] = useState('TaskFlowPass2026!');
   const [gender, setGender] = useState('Prefer not to say');
+
+  // Password visibility toggles
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Selected Country state (defaults to United States or user's current country)
   const [selectedCountry, setSelectedCountry] = useState<CountryData>(() => {
@@ -105,7 +114,7 @@ export const AuthScreen: React.FC = () => {
       currencySymbol: selectedCountry.currencySymbol,
       isOnboarded: true,
     });
-    triggerNotification('Google Authentication Successful', 'Synced with Spectrey Workspace', 'SYSTEM', 'dashboard');
+    triggerNotification('Google Authentication Successful', 'Synced with Task Flow Workspace', 'SYSTEM', 'dashboard');
     setCurrentScreen('dashboard');
   };
 
@@ -363,18 +372,26 @@ export const AuthScreen: React.FC = () => {
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
-                      type="password"
+                      type={showNewPassword ? 'text' : 'password'}
                       required
                       minLength={6}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Enter new password"
-                      className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                      className={`w-full border rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                         isLight
                           ? 'bg-slate-100 border-slate-300 text-slate-900'
                           : 'bg-[#0A0C14] border-[#2E3552] text-white'
                       }`}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
+                      title={showNewPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
@@ -383,18 +400,26 @@ export const AuthScreen: React.FC = () => {
                   <div className="relative">
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
-                      type="password"
+                      type={showConfirmPassword ? 'text' : 'password'}
                       required
                       minLength={6}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirm new password"
-                      className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                      className={`w-full border rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                         isLight
                           ? 'bg-slate-100 border-slate-300 text-slate-900'
                           : 'bg-[#0A0C14] border-[#2E3552] text-white'
                       }`}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
+                      title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
 
@@ -410,7 +435,7 @@ export const AuthScreen: React.FC = () => {
                 <CheckCircle2 className="w-12 h-12 text-[#00E676] mx-auto animate-bounce" />
                 <h3 className="font-bold text-lg">Password Reset Successfully!</h3>
                 <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                  Logging into your Spectrey executive workspace...
+                  Logging into your Task Flow executive workspace...
                 </p>
               </div>
             )}
@@ -515,16 +540,26 @@ export const AuthScreen: React.FC = () => {
 
                   {/* Auto-Configured Details Preview Badge */}
                   <div
-                    className={`p-3 rounded-xl border text-[11px] space-y-1 ${
+                    className={`p-3 rounded-xl border text-[11px] space-y-1.5 ${
                       isLight
                         ? 'bg-slate-100 border-slate-200 text-slate-700'
                         : 'bg-[#0A0C14] border-[#2E3552] text-slate-300'
                     }`}
                   >
-                    <div className="font-bold text-[#06B6D4] flex items-center gap-1">
-                      <Sparkles className="w-3.5 h-3.5" /> Auto-Configured Defaults:
+                    <div className="font-bold text-[#06B6D4] flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5" /> Workspace Configuration & Password:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="text-[10px] font-semibold text-[#06B6D4] hover:underline cursor-pointer flex items-center gap-0.5"
+                      >
+                        {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                        <span>{showPassword ? 'Hide' : 'Show'}</span>
+                      </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-1 text-[10px]">
+                    <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                       <div>
                         Currency:{' '}
                         <span className="font-bold text-[#00E676]">
@@ -534,6 +569,12 @@ export const AuthScreen: React.FC = () => {
                       <div>
                         Timezone:{' '}
                         <span className="font-semibold">{selectedCountry.timezone}</span>
+                      </div>
+                      <div className="col-span-2 flex items-center gap-1 pt-0.5 border-t border-slate-700/30">
+                        <span className="text-slate-400">Password:</span>{' '}
+                        <span className="font-mono font-bold text-[#A78BFA]">
+                          {password ? (showPassword ? password : '••••••••••••') : 'Not set yet'}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -577,17 +618,25 @@ export const AuthScreen: React.FC = () => {
                 <div className="relative">
                   <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                    className={`w-full border rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                       isLight
                         ? 'bg-slate-100 border-slate-300 text-slate-900'
                         : 'bg-[#0A0C14] border-[#2E3552] text-white'
                     }`}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 

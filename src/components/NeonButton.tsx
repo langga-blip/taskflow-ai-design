@@ -29,13 +29,13 @@ export const NeonButton: React.FC<NeonButtonProps> = ({
 
   const variantClasses = {
     primary:
-      'bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#2563EB] text-white font-semibold shadow-[0_0_20px_rgba(124,58,237,0.4)] hover:shadow-[0_0_30px_rgba(124,58,237,0.7)] hover:scale-[1.02] active:scale-[0.98]',
+      'bg-gradient-to-r from-[#7C3AED] via-[#8B5CF6] to-[#2563EB] text-white font-semibold shadow-[0_0_20px_rgba(124,58,237,0.4)] hover:shadow-[0_0_30px_rgba(124,58,237,0.7)] active:opacity-90',
     secondary:
-      'bg-[#1E2338] text-white border border-[#2E3552] hover:border-[#7C3AED]/50 hover:bg-[#252C48]',
+      'bg-[#1E2338] text-white border border-[#2E3552] hover:border-[#7C3AED]/50 hover:bg-[#252C48] active:opacity-90',
     outline:
-      'bg-transparent text-[#06B6D4] border border-[#06B6D4]/50 hover:bg-[#06B6D4]/10 hover:border-[#06B6D4]',
+      'bg-transparent text-[#06B6D4] border border-[#06B6D4]/50 hover:bg-[#06B6D4]/10 hover:border-[#06B6D4] active:opacity-90',
     danger:
-      'bg-gradient-to-r from-red-600 to-rose-700 text-white font-semibold shadow-[0_0_15px_rgba(239,68,68,0.4)] hover:scale-[1.02]',
+      'bg-gradient-to-r from-red-600 to-rose-700 text-white font-semibold shadow-[0_0_15px_rgba(239,68,68,0.4)] active:opacity-90',
   }[variant];
 
   return (

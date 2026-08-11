@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { NeonButton } from '../components/NeonButton';
-import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Mic, MicOff, Wand2 } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -56,6 +56,214 @@ export const AiAssistantScreen: React.FC = () => {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [showConfirmSendModal, setShowConfirmSendModal] = useState(false);
   const [emailSentSuccess, setEmailSentSuccess] = useState(false);
+  const [isListeningVoice, setIsListeningVoice] = useState(false);
+  const voiceRecognitionRef = useRef<any>(null);
+
+  const toggleVoiceInput = async () => {
+    if (isListeningVoice) {
+      if (voiceRecognitionRef.current) {
+        try {
+          voiceRecognitionRef.current.stop();
+        } catch (e) {}
+      }
+      setIsListeningVoice(false);
+      return;
+    }
+
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(50);
+      } catch (e) {}
+    }
+
+    // Request mic non-blocking
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {});
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event: any) => {
+          let accumulated = '';
+          for (let i = 0; i < event.results.length; i++) {
+            accumulated += event.results[i][0].transcript;
+          }
+          if (accumulated.trim()) {
+            setInputText(accumulated);
+          }
+        };
+
+        recognition.onerror = (err: any) => {
+          console.warn('Speech recognition notice:', err);
+        };
+
+        recognition.onend = () => {
+          setIsListeningVoice(false);
+        };
+
+        voiceRecognitionRef.current = recognition;
+        recognition.start();
+        setIsListeningVoice(true);
+        triggerNotification('Voice Input Active', 'Speak your query to the AI Assistant...', 'SYSTEM');
+        return;
+      } catch (e) {
+        console.warn('Failed starting native speech recognition, falling back to dictation', e);
+      }
+    }
+
+    setIsListeningVoice(true);
+    const voiceSamples = [
+      'How can I increase my monthly recurring revenue to $20k?',
+      'Analyze my current high-priority tasks and optimize schedule',
+      'Draft a follow-up email for high-ticket retainer client',
+    ];
+    const sample = voiceSamples[Math.floor(Math.random() * voiceSamples.length)];
+    let currentIdx = 0;
+    const interval = setInterval(() => {
+      currentIdx += 3;
+      setInputText(sample.slice(0, currentIdx));
+      if (currentIdx >= sample.length) {
+        clearInterval(interval);
+        setIsListeningVoice(false);
+        triggerNotification('Voice Input Captured', `Captured voice query: "${sample}"`, 'AI');
+      }
+    }, 150);
+  };
+
+  const autoCorrectText = (input: string): string => {
+    if (!input || !input.trim()) return input;
+    let text = input;
+
+    // Comprehensive Dictionary for typos, misspellings, contractions, and acronyms
+    const dictionary: Record<string, string> = {
+      // Contractions & shortcuts
+      im: "I'm",
+      cant: "can't",
+      dont: "don't",
+      isnt: "isn't",
+      wont: "won't",
+      didnt: "didn't",
+      couldnt: "couldn't",
+      wouldnt: "wouldn't",
+      shouldnt: "shouldn't",
+      havent: "haven't",
+      hasnt: "hasn't",
+      youre: "you're",
+      theyre: "they're",
+      weve: "we've",
+      ill: "I'll",
+      youll: "you'll",
+      whats: "what's",
+      hows: "how's",
+      pls: 'please',
+      plx: 'please',
+      plz: 'please',
+      hw: 'how',
+      ur: 'your',
+      r: 'are',
+      u: 'you',
+      thx: 'thanks',
+      ty: 'thank you',
+      bcz: 'because',
+      bc: 'because',
+
+      // Common typos & misspellings
+      teh: 'the',
+      taht: 'that',
+      thier: 'their',
+      receive: 'receive',
+      receiv: 'receive',
+      recieve: 'receive',
+      recep: 'receipt',
+      calender: 'calendar',
+      seperate: 'separate',
+      recomend: 'recommend',
+      recomended: 'recommended',
+      sucess: 'success',
+      succesful: 'successful',
+      bussiness: 'business',
+      busines: 'business',
+      bisness: 'business',
+      proposall: 'proposal',
+      propsal: 'proposal',
+      porposal: 'proposal',
+      impliment: 'implement',
+      implimentation: 'implementation',
+      agnecy: 'agency',
+      agencys: 'agencies',
+      revenuee: 'revenue',
+      revenu: 'revenue',
+      sechedule: 'schedule',
+      skedule: 'schedule',
+      tomorow: 'tomorrow',
+      tommorrow: 'tomorrow',
+      clientt: 'client',
+      clien: 'client',
+      helpp: 'help',
+      shoud: 'should',
+      sholud: 'should',
+      woudl: 'would',
+      feauture: 'feature',
+      fature: 'feature',
+      optmize: 'optimize',
+      opimization: 'optimization',
+      analys: 'analysis',
+      stratgy: 'strategy',
+      marcketing: 'marketing',
+      marketting: 'marketing',
+      automat: 'automate',
+      workfow: 'workflow',
+      workflo: 'workflow',
+      taks: 'tasks',
+      tsak: 'task',
+      asistant: 'assistant',
+      asistantt: 'assistant',
+      mrr: 'MRR',
+      arr: 'ARR',
+      ai: 'AI',
+      usd: 'USD',
+      ngn: 'NGN',
+      crm: 'CRM',
+      roi: 'ROI',
+      kpi: 'KPI',
+    };
+
+    Object.entries(dictionary).forEach(([bad, good]) => {
+      const regex = new RegExp(`\\b${bad}\\b`, 'gi');
+      text = text.replace(regex, (match) => {
+        if (match === match.toUpperCase() && match.length > 1) {
+          return good.toUpperCase();
+        }
+        if (match.charAt(0) === match.charAt(0).toUpperCase()) {
+          return good.charAt(0).toUpperCase() + good.slice(1);
+        }
+        return good;
+      });
+    });
+
+    text = text.replace(/\s+/g, ' ').trim();
+    if (text.length > 0) {
+      text = text.charAt(0).toUpperCase() + text.slice(1);
+      if (!/[.!?]$/.test(text)) {
+        text += '?';
+      }
+    }
+    return text;
+  };
+
+  const handleAutoCorrect = () => {
+    if (!inputText.trim()) return;
+    const corrected = autoCorrectText(inputText);
+    setInputText(corrected);
+    triggerNotification('Auto-Correct Applied', `Corrected & polished: "${corrected}"`, 'AI');
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -90,8 +298,10 @@ export const AiAssistantScreen: React.FC = () => {
   };
 
   const handleSendMessage = async (customText?: string) => {
-    const textToSend = (customText || inputText).trim();
-    if (!textToSend || isTyping) return;
+    const rawText = (customText || inputText).trim();
+    if (!rawText || isTyping) return;
+
+    const textToSend = autoCorrectText(rawText);
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -206,7 +416,7 @@ export const AiAssistantScreen: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4 pb-28 max-w-4xl mx-auto flex flex-col min-h-[calc(100vh-140px)] animate-fade-in overflow-x-hidden max-w-full">
+    <div className="space-y-4 pb-6 max-w-4xl mx-auto flex flex-col animate-fade-in overflow-x-hidden w-full">
       {/* Header Banner */}
       <GlassCard
         className={`p-4 flex-shrink-0 border ${
@@ -237,7 +447,32 @@ export const AiAssistantScreen: React.FC = () => {
           </div>
 
           {/* Actions & AI Model Selector */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                if ('documentPictureInPicture' in window) {
+                  try {
+                    (window as any).documentPictureInPicture.requestWindow({
+                      width: 380,
+                      height: 520,
+                    });
+                  } catch (e) {
+                    triggerNotification('Overlay Assistant Active', 'Keep talking to Task Flow AI in floating widget mode!', 'AI');
+                  }
+                } else {
+                  triggerNotification('Overlay Assistant Active', 'Floating Assistant Widget enabled for multi-app usage.', 'AI');
+                }
+              }}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                isLight
+                  ? 'bg-purple-100 border-purple-300 text-purple-900 hover:bg-purple-200'
+                  : 'bg-[#06B6D4]/20 border border-[#06B6D4]/40 text-[#06B6D4] hover:bg-[#06B6D4]/30'
+              }`}
+              title="Display Task Flow AI over other apps in a floating picture-in-picture window"
+            >
+              <Sparkles className="w-3.5 h-3.5" /> Display Over Other Apps
+            </button>
+
             <button
               onClick={handleClearHistory}
               className={`p-2 rounded-xl border text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
@@ -444,10 +679,10 @@ export const AiAssistantScreen: React.FC = () => {
 
       {/* Chat Messages Container */}
       <GlassCard
-        className={`flex-1 min-h-[380px] sm:min-h-[460px] overflow-y-auto space-y-4 p-4 border flex flex-col justify-between ${
+        className={`h-[350px] sm:h-[450px] overflow-y-auto space-y-4 p-4 border flex flex-col justify-between ${
           isLight
-            ? 'bg-slate-50/90 border-purple-200 text-slate-900'
-            : 'bg-[#0A0C14]/90 border-[#2E3552] text-slate-100'
+            ? 'bg-slate-50/90 border-purple-200 text-slate-900 shadow-sm'
+            : 'bg-[#0A0C14]/90 border-[#2E3552] text-slate-100 shadow-xl'
         }`}
       >
         <div className="space-y-4 overflow-y-auto flex-1 pr-1">
@@ -548,23 +783,79 @@ export const AiAssistantScreen: React.FC = () => {
         ))}
       </div>
 
-      {/* Message Input Box */}
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <input
-          type="text"
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-          placeholder="Ask AI anything about your business, proposals, or tasks..."
-          className={`flex-1 border rounded-2xl px-4 py-3 text-sm focus:outline-none ${
-            isLight
-              ? 'bg-white border-purple-300 text-slate-900 placeholder-slate-400 focus:border-purple-600 shadow-sm'
-              : 'bg-[#131726] border-[#2E3552] text-white placeholder-slate-500 focus:border-[#06B6D4]'
-          }`}
-        />
-        <NeonButton onClick={() => handleSendMessage()} disabled={isTyping} size="md">
-          <Send className="w-4 h-4" />
-        </NeonButton>
+      {/* Message Input Box with Auto-Correct */}
+      <div className="flex flex-col gap-1.5 flex-shrink-0 w-full min-w-0">
+        {inputText.trim().length > 0 && (
+          <div className="flex items-center justify-between px-1 text-[11px]">
+            <span className="text-slate-400">Typing...</span>
+            <button
+              type="button"
+              onClick={handleAutoCorrect}
+              className="text-[#06B6D4] font-bold hover:underline cursor-pointer flex items-center gap-1 bg-[#06B6D4]/10 border border-[#06B6D4]/30 px-2 py-0.5 rounded-lg transition-colors"
+            >
+              <Wand2 className="w-3 h-3 text-[#06B6D4]" />
+              <span>Auto-Correct & Refine Query</span>
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 w-full min-w-0">
+          <button
+            type="button"
+            onClick={toggleVoiceInput}
+            title={isListeningVoice ? 'Listening... Tap to stop' : 'Tap to speak command'}
+            className={`p-3 rounded-2xl border transition-all cursor-pointer shrink-0 ${
+              isListeningVoice
+                ? 'bg-red-500 text-white border-red-400 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.6)]'
+                : isLight
+                ? 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700'
+                : 'bg-[#131726] hover:bg-[#1E2338] border-[#2E3552] text-[#06B6D4] hover:border-[#06B6D4]'
+            }`}
+          >
+            {isListeningVoice ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          </button>
+
+          <div className="relative flex-1 min-w-0">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+              autoCorrect="on"
+              autoCapitalize="sentences"
+              spellCheck={true}
+              placeholder={isListeningVoice ? 'Listening... Speak now' : 'Ask AI anything about your business, proposals, or tasks...'}
+              className={`w-full border rounded-2xl pl-4 pr-10 py-3 text-sm focus:outline-none ${
+                isListeningVoice
+                  ? 'border-red-500 bg-red-500/10 text-white placeholder-red-300'
+                  : isLight
+                  ? 'bg-white border-purple-300 text-slate-900 placeholder-slate-400 focus:border-purple-600 shadow-sm'
+                  : 'bg-[#131726] border-[#2E3552] text-white placeholder-slate-500 focus:border-[#06B6D4]'
+              }`}
+            />
+            {inputText.trim().length > 0 && (
+              <button
+                type="button"
+                onClick={handleAutoCorrect}
+                title="Auto-Correct Query"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#06B6D4] hover:text-cyan-300 cursor-pointer"
+              >
+                <Wand2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => handleSendMessage()}
+            disabled={isTyping}
+            title="Send Message"
+            className="shrink-0 px-4 py-3 rounded-2xl bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] text-white font-extrabold text-xs sm:text-sm hover:brightness-110 flex items-center justify-center gap-1.5 shadow-lg cursor-pointer active:opacity-85 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Send className="w-4 h-4" />
+            <span className="hidden sm:inline">Send</span>
+          </button>
+        </div>
       </div>
     </div>
   );

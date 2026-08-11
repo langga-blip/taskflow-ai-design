@@ -36,7 +36,7 @@ export const SplashScreen: React.FC = () => {
             TaskFlow AI
           </h1>
           <p className="text-sm font-semibold text-[#06B6D4] mt-1 tracking-widest uppercase">
-            Spectrey Business OS
+            Task Flow Business OS
           </p>
         </div>
 

@@ -13,7 +13,10 @@ export const NotificationCenterSheet: React.FC = () => {
     deleteNotification,
     clearAllNotifications,
     setCurrentScreen,
+    userProfile,
   } = useApp();
+
+  const isLight = userProfile?.themeMode === 'Light';
 
   const [selectedFilter, setSelectedFilter] = useState<string>('ALL');
 
@@ -55,21 +58,39 @@ export const NotificationCenterSheet: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-md bg-[#0A0C14] border-l border-[#2E3552] h-full flex flex-col p-5 shadow-2xl overflow-hidden">
+      <div
+        className={`w-full max-w-md h-full flex flex-col p-5 shadow-2xl overflow-hidden border-l transition-colors ${
+          isLight
+            ? 'bg-white border-purple-200 text-slate-900'
+            : 'bg-[#0A0C14] border-[#2E3552] text-white'
+        }`}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#2E3552]">
+        <div
+          className={`flex items-center justify-between pb-4 border-b ${
+            isLight ? 'border-purple-200' : 'border-[#2E3552]'
+          }`}
+        >
           <div className="flex items-center gap-2">
             <div className="p-2 bg-[#7C3AED]/20 rounded-xl border border-[#7C3AED]/40 text-[#A78BFA]">
               <Bell className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-bold text-lg text-white">Notifications</h2>
-              <p className="text-xs text-slate-400">Activity & Spectrey Workspace Updates</p>
+              <h2 className={`font-bold text-lg ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                Notifications
+              </h2>
+              <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                Activity & Task Flow Workspace Updates
+              </p>
             </div>
           </div>
           <button
             onClick={() => setIsNotificationSheetOpen(false)}
-            className="p-2 rounded-xl bg-[#131726] border border-[#2E3552] text-slate-400 hover:text-white transition-colors cursor-pointer"
+            className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+              isLight
+                ? 'bg-slate-100 border-slate-300 text-slate-600 hover:text-slate-900'
+                : 'bg-[#131726] border-[#2E3552] text-slate-400 hover:text-white'
+            }`}
           >
             <X className="w-5 h-5" />
           </button>
@@ -82,10 +103,12 @@ export const NotificationCenterSheet: React.FC = () => {
               <button
                 key={cat.id}
                 onClick={() => setSelectedFilter(cat.id)}
-                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer whitespace-nowrap border ${
                   selectedFilter === cat.id
-                    ? 'bg-[#7C3AED] text-white'
-                    : 'bg-[#131726] text-slate-400 hover:text-slate-200 border border-[#2E3552]'
+                    ? 'bg-[#7C3AED] text-white border-[#7C3AED]'
+                    : isLight
+                    ? 'bg-purple-50 text-purple-900 border-purple-200 hover:bg-purple-100'
+                    : 'bg-[#131726] text-slate-400 hover:text-slate-200 border-[#2E3552]'
                 }`}
               >
                 {cat.label}
@@ -97,7 +120,7 @@ export const NotificationCenterSheet: React.FC = () => {
         {/* Notifications List */}
         <div className="flex-1 overflow-y-auto space-y-3 pr-1 my-2">
           {filteredNotifications.length === 0 ? (
-            <div className="text-center py-12 text-slate-500">
+            <div className={`text-center py-12 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
               <Bell className="w-10 h-10 mx-auto mb-2 opacity-30" />
               <p className="text-sm">No notifications found.</p>
             </div>
@@ -108,19 +131,33 @@ export const NotificationCenterSheet: React.FC = () => {
                 onClick={() => handleNotificationClick(n.actionRoute as ScreenRoute, n.id)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer ${
                   n.isRead
-                    ? 'bg-[#131726]/60 border-[#2E3552]/60 text-slate-400'
+                    ? isLight
+                      ? 'bg-slate-50 border-purple-100 text-slate-600'
+                      : 'bg-[#131726]/60 border-[#2E3552]/60 text-slate-400'
+                    : isLight
+                    ? 'bg-purple-50/80 border-purple-300 text-slate-900 shadow-sm'
                     : 'bg-[#131726] border-[#7C3AED]/40 text-white shadow-[0_0_15px_rgba(124,58,237,0.1)]'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
                     {getCategoryIcon(n.category)}
-                    <span className="font-bold text-sm text-slate-100">{n.title}</span>
+                    <span className={`font-bold text-sm ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>
+                      {n.title}
+                    </span>
                   </div>
-                  <span className="text-[10px] text-slate-500">{n.timestamp}</span>
+                  <span className={`text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
+                    {n.timestamp}
+                  </span>
                 </div>
-                <p className="text-xs text-slate-300 mt-2 leading-relaxed">{n.message}</p>
-                <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#2E3552]/40 text-[11px]">
+                <p className={`text-xs mt-2 leading-relaxed ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                  {n.message}
+                </p>
+                <div
+                  className={`flex items-center justify-between mt-3 pt-2 border-t text-[11px] ${
+                    isLight ? 'border-purple-100' : 'border-[#2E3552]/40'
+                  }`}
+                >
                   {n.actionRoute && (
                     <span className="text-[#06B6D4] font-semibold hover:underline">
                       Tap to open &rarr;
@@ -131,7 +168,7 @@ export const NotificationCenterSheet: React.FC = () => {
                       e.stopPropagation();
                       deleteNotification(n.id);
                     }}
-                    className="ml-auto text-slate-500 hover:text-red-400 p-1"
+                    className="ml-auto text-slate-500 hover:text-red-500 p-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

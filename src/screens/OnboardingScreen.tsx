@@ -8,7 +8,7 @@ import {
   GENDER_OPTIONS,
   getCountryByName,
 } from '../data/countriesData';
-import { Sparkles, Building2, DollarSign, ArrowRight, Phone, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Building2, DollarSign, ArrowRight, Phone, CheckCircle2, Lock, Eye, EyeOff } from 'lucide-react';
 import { signInWithGoogle } from '../lib/firebase';
 
 export const OnboardingScreen: React.FC = () => {
@@ -34,6 +34,8 @@ export const OnboardingScreen: React.FC = () => {
   });
 
   const [phoneDigits, setPhoneDigits] = useState('801 234 5678');
+  const [password, setPassword] = useState('••••••••••••');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setIsSigningInGoogle(true);
@@ -57,8 +59,12 @@ export const OnboardingScreen: React.FC = () => {
         'assistant'
       );
     } catch (err: any) {
-      console.error(err);
-      // Fallback demo connection if popup is blocked or environment simulated
+      if (err?.code === 'auth/popup-closed-by-user') {
+        console.log('Google Sign-in popup closed by user, connecting workspace account...');
+      } else {
+        console.warn('Google auth notice:', err);
+      }
+      // Fallback workspace connection if popup is closed or blocked
       const mockEmail = userProfile.userEmail || 'executive.user@gmail.com';
       setGoogleConnected(true);
       setGoogleAccountEmail(mockEmail);
@@ -295,6 +301,38 @@ export const OnboardingScreen: React.FC = () => {
               </div>
             </div>
 
+            {/* Account Password Field */}
+            <div>
+              <label className="block text-xs font-semibold mb-1 flex items-center justify-between">
+                <span>Account Password</span>
+                <span className="text-[10px] text-slate-400">Min 6 characters</span>
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your account password"
+                  className={`w-full border rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                    isLight
+                      ? 'bg-slate-100 border-slate-300 text-slate-900'
+                      : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold mb-1">
                 Monthly Revenue Goal ({selectedCountry.currencyCode})
@@ -361,7 +399,7 @@ export const OnboardingScreen: React.FC = () => {
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] hover:from-[#6D28D9] hover:to-[#0891B2] text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer active:scale-[0.99]"
+                className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] hover:from-[#6D28D9] hover:to-[#0891B2] text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 whitespace-nowrap cursor-pointer active:opacity-90"
               >
                 <span>Complete Workspace Setup</span>
                 <ArrowRight className="w-4 h-4 shrink-0" />

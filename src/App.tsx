@@ -70,17 +70,21 @@ const MainAppContent: React.FC = () => {
 
   return (
     <div
-      className={`min-h-screen max-w-full overflow-x-hidden font-sans selection:bg-[#7C3AED] selection:text-white transition-colors duration-200 ${
+      className={`min-h-screen max-w-full font-sans selection:bg-[#7C3AED] selection:text-white transition-colors duration-200 ${
         isLight
           ? 'bg-slate-50 text-slate-900'
           : 'bg-[#0A0C14] text-slate-100'
       }`}
     >
-      {/* Header Bar */}
-      {!isFullscreenView && <HeaderBar />}
+      {/* Header Bar - Fixed pinned to top of viewport with z-index 50 */}
+      {!isFullscreenView && (
+        <div className="fixed top-0 left-0 right-0 z-50">
+          <HeaderBar />
+        </div>
+      )}
 
       {/* Screen Body */}
-      <main className={!isFullscreenView ? 'p-4 sm:p-6 max-w-full overflow-x-hidden' : 'max-w-full overflow-x-hidden'}>
+      <main className={!isFullscreenView ? 'pt-[80px] sm:pt-[88px] pb-24 px-4 sm:px-6 max-w-7xl mx-auto' : ''}>
         {renderScreen()}
       </main>
 

@@ -62,20 +62,20 @@ export const CustomBottomNavBar: React.FC = () => {
             <button
               key={item.id}
               onClick={() => setCurrentScreen(item.id)}
-              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-all duration-200 cursor-pointer ${
+              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-colors cursor-pointer active:opacity-80 touch-manipulation select-none ${
                 isActive
                   ? isLight
-                    ? 'text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/40 font-bold'
-                    : 'text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/30 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
+                    ? 'text-purple-900 bg-purple-100 border border-purple-300 font-extrabold shadow-sm'
+                    : 'text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/30 shadow-[0_0_12px_rgba(6,182,212,0.2)] font-bold'
                   : isLight
-                  ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#131726]'
+                  ? 'text-slate-700 hover:text-slate-950 hover:bg-slate-100 font-semibold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#131726] font-medium'
               }`}
             >
-              <div className={isActive ? 'scale-110 transition-transform' : ''}>
+              <div>
                 {item.icon}
               </div>
-              <span className={`text-[10px] mt-1 ${isActive ? 'font-bold text-[#06B6D4]' : 'font-medium'}`}>
+              <span className={`text-[10px] mt-1 ${isActive ? (isLight ? 'font-extrabold text-purple-900' : 'font-bold text-[#06B6D4]') : (isLight ? 'font-semibold text-slate-700' : 'font-medium')}`}>
                 {item.label}
               </span>
             </button>
