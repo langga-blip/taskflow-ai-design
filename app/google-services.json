@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "232912615702",
+    "project_id": "task-flow-ai-b1689",
+    "storage_bucket": "task-flow-ai-b1689.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:232912615702:android:5790080d46611ca7397837",
+        "android_client_info": {
+          "package_name": "com.aistudio.taskflowai.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAN1JMsqkgYUvGzQBR2-TuPQkmDUm5P54E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
