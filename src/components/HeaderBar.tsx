@@ -117,12 +117,12 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
           {getScreenTitle()}
         </div>
 
-        {/* Action Controls - Neatly Aligned Icon Bar */}
+        {/* Action Controls - Horizontally Swipeable Icon Bar */}
         <div
-          className={`flex items-center gap-1 sm:gap-2 ml-auto shrink-0 rounded-xl sm:bg-transparent sm:border-none sm:p-0 ${
+          className={`flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none py-1 px-1.5 touch-pan-x ml-auto shrink-0 flex-nowrap rounded-xl border sm:bg-transparent sm:border-none sm:p-0 shadow-inner w-[170px] xs:w-[205px] sm:w-auto max-w-[170px] xs:max-w-[205px] sm:max-w-none ${
             isLight
-              ? 'text-purple-950'
-              : 'text-slate-200'
+              ? 'border-purple-200/80 bg-purple-100/70 text-purple-950'
+              : 'border-[#2E3552]/50 bg-[#131726]/80 text-slate-200'
           }`}
         >
           {/* 1. Light / Dark Mode Toggle Button */}
