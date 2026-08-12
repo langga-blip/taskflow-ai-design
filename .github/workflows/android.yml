@@ -13,11 +13,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    env:
-      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -35,7 +30,11 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        run: |
+          ./gradlew assembleDebug \
+            -PDEEPSEEK_API_KEY="${{ secrets.DEEPSEEK_API_KEY }}" \
+            -PGEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            -POPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
