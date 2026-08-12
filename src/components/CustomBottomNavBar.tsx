@@ -49,20 +49,20 @@ export const CustomBottomNavBar: React.FC = () => {
 
   return (
     <nav
-      className={`fixed bottom-0 left-0 right-0 z-40 backdrop-blur-2xl border-t py-2 px-3 transition-colors ${
+      className={`fixed bottom-0 left-0 right-0 z-40 backdrop-blur-2xl border-t py-1.5 px-1 sm:px-3 transition-colors ${
         isLight
           ? 'bg-white/95 border-slate-200 shadow-lg'
           : 'bg-[#0A0C14]/90 border-[#2E3552]'
       }`}
     >
-      <div className="max-w-md mx-auto flex items-center justify-around">
+      <div className="max-w-lg mx-auto flex items-center justify-between relative px-0.5">
         {navItems.map((item) => {
           const isActive = currentScreen === item.id;
           return (
             <button
               key={item.id}
               onClick={() => setCurrentScreen(item.id)}
-              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-xl transition-colors cursor-pointer active:opacity-80 touch-manipulation select-none ${
+              className={`relative flex flex-col items-center justify-center py-1 px-1 xs:px-2 sm:px-2.5 rounded-xl transition-all cursor-pointer active:opacity-80 touch-manipulation select-none flex-1 min-w-0 ${
                 isActive
                   ? isLight
                     ? 'text-purple-900 bg-purple-100 border border-purple-300 font-extrabold shadow-sm'
@@ -72,10 +72,10 @@ export const CustomBottomNavBar: React.FC = () => {
                   : 'text-slate-400 hover:text-slate-200 hover:bg-[#131726] font-medium'
               }`}
             >
-              <div>
+              <div className="flex-shrink-0">
                 {item.icon}
               </div>
-              <span className={`text-[10px] mt-1 ${isActive ? (isLight ? 'font-extrabold text-purple-900' : 'font-bold text-[#06B6D4]') : (isLight ? 'font-semibold text-slate-700' : 'font-medium')}`}>
+              <span className={`text-[9.5px] xs:text-[10px] sm:text-[11px] mt-0.5 whitespace-nowrap text-center leading-tight tracking-tight ${isActive ? (isLight ? 'font-extrabold text-purple-900' : 'font-bold text-[#06B6D4]') : (isLight ? 'font-semibold text-slate-700' : 'font-medium')}`}>
                 {item.label}
               </span>
             </button>

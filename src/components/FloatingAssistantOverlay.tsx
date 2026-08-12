@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Bot, Sparkles, Mic, MicOff, Volume2, X, Maximize2, Layers, ExternalLink, ShieldCheck } from 'lucide-react';
 import { askAssistantApi } from '../services/api';
+import { createVoiceRecognizer, speakWithAlexaVoice, VoiceRecognizerController } from '../utils/speechUtils';
+import { autoCorrectText } from '../utils/autoCorrect';
 
 export const FloatingAssistantOverlay: React.FC = () => {
-  const { currentScreen, setCurrentScreen, userProfile, askAssistant } = useApp();
+  const { currentScreen, setCurrentScreen, userProfile } = useApp();
 
   const isLight = userProfile?.themeMode === 'Light';
 
@@ -16,97 +18,117 @@ export const FloatingAssistantOverlay: React.FC = () => {
   const [isOverlayModeActive, setIsOverlayModeActive] = useState(false);
   const [pipWindowRef, setPipWindowRef] = useState<Window | null>(null);
 
-  const recognitionRef = useRef<any>(null);
+  const controllerRef = useRef<VoiceRecognizerController | null>(null);
+  const currentTranscriptRef = useRef<string>('');
+
+  useEffect(() => {
+    const handleLaunchPip = () => {
+      launchPictureInPicture();
+    };
+    window.addEventListener('launch-overlay-pip', handleLaunchPip);
+    return () => window.removeEventListener('launch-overlay-pip', handleLaunchPip);
+  }, [isLight, userProfile]);
 
   // Hide main button when already on full AI Assistant screen
   const isAssistantScreen = currentScreen === 'assistant';
 
-  // Speech synthesis speak helper
+  // Speech synthesis speak helper using Amazon Alexa voice
   const speakText = (text: string) => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-      window.speechSynthesis.speak(utterance);
-    }
+    speakWithAlexaVoice(text);
   };
 
   // Process voice input through AI
   const handleVoiceQuery = async (queryText: string) => {
     if (!queryText.trim()) return;
+    const correctedQuery = autoCorrectText(queryText);
     setIsThinking(true);
     setResponse('Task Flow AI is analyzing your prompt...');
 
+    // If PiP window active, update PiP text immediately
+    if (pipWindowRef) {
+      const pipText = pipWindowRef.document.getElementById('pip-transcript');
+      if (pipText) pipText.innerText = '🤔 Task Flow AI is analyzing: "' + correctedQuery + '"...';
+    }
+
     try {
       const aiReply = await askAssistantApi(
-        `[Overlay Assistant Mode] User voice prompt: ${queryText}`,
+        `[Overlay Assistant Mode] User voice prompt: ${correctedQuery}`,
         userProfile
       );
 
       setResponse(aiReply);
       speakText(aiReply);
+
+      if (pipWindowRef) {
+        const pipText = pipWindowRef.document.getElementById('pip-transcript');
+        if (pipText) pipText.innerText = '🤖 ' + aiReply;
+      }
     } catch (err) {
       const fallback = "I'm ready to assist with your business tasks, revenue goals, and scheduling.";
       setResponse(fallback);
       speakText(fallback);
+
+      if (pipWindowRef) {
+        const pipText = pipWindowRef.document.getElementById('pip-transcript');
+        if (pipText) pipText.innerText = '🤖 ' + fallback;
+      }
     } finally {
       setIsThinking(false);
     }
   };
 
   // Toggle Speech Recognition
-  const toggleListening = () => {
+  const toggleListening = async () => {
     if (isListening) {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {}
+      if (controllerRef.current) {
+        controllerRef.current.stop();
       }
       setIsListening(false);
+      if (pipWindowRef) {
+        const pipMic = pipWindowRef.document.getElementById('pip-mic');
+        if (pipMic) pipMic.innerText = '🎙️ Speak to AI Assistant';
+      }
       return;
     }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert('Speech Recognition is not supported on this browser. Try Chrome, Edge, or Safari.');
-      return;
+    currentTranscriptRef.current = '';
+    setIsListening(true);
+    setTranscript('Listening for your voice...');
+    if (pipWindowRef) {
+      const pipText = pipWindowRef.document.getElementById('pip-transcript');
+      const pipMic = pipWindowRef.document.getElementById('pip-mic');
+      if (pipText) pipText.innerText = '🎙️ Listening... Speak your command now!';
+      if (pipMic) pipMic.innerText = '🔴 Listening... (Click to Stop)';
     }
 
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        setTranscript('Listening...');
-      };
-
-      recognition.onresult = (event: any) => {
-        const text = Array.from(event.results)
-          .map((result: any) => result[0].transcript)
-          .join('');
-        setTranscript(text);
-      };
-
-      recognition.onerror = () => {
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-        if (transcript && transcript !== 'Listening...') {
-          handleVoiceQuery(transcript);
+    const controller = createVoiceRecognizer(
+      (transcribedText) => {
+        currentTranscriptRef.current = transcribedText;
+        setTranscript(transcribedText);
+        if (pipWindowRef) {
+          const pipText = pipWindowRef.document.getElementById('pip-transcript');
+          if (pipText) pipText.innerText = '🗣️ ' + transcribedText;
         }
-      };
+      },
+      (errorMsg) => {
+        setTranscript(errorMsg);
+        setIsListening(false);
+      },
+      () => {
+        setIsListening(false);
+        if (pipWindowRef) {
+          const pipMic = pipWindowRef.document.getElementById('pip-mic');
+          if (pipMic) pipMic.innerText = '🎙️ Speak to AI Assistant';
+        }
+        const textToQuery = currentTranscriptRef.current.trim();
+        if (textToQuery && textToQuery !== 'Listening...') {
+          handleVoiceQuery(textToQuery);
+        }
+      }
+    );
 
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (e) {
-      setIsListening(false);
-    }
+    controllerRef.current = controller;
+    await controller.start();
   };
 
   // Request Picture-in-Picture window (Display Over Other Apps feature)
@@ -114,12 +136,17 @@ export const FloatingAssistantOverlay: React.FC = () => {
     if ('documentPictureInPicture' in window) {
       try {
         const pipWin = await (window as any).documentPictureInPicture.requestWindow({
-          width: 380,
-          height: 520,
+          width: 390,
+          height: 540,
         });
 
         setPipWindowRef(pipWin);
         setIsOverlayModeActive(true);
+
+        const bgColor = isLight ? '#F8FAFC' : '#0A0C14';
+        const textColor = isLight ? '#0F172A' : '#F8FAFC';
+        const cardBg = isLight ? '#FFFFFF' : '#131726';
+        const borderColor = isLight ? '#E2E8F0' : '#2E3552';
 
         // Inject styles & interactive markup into PiP window
         pipWin.document.body.innerHTML = `
@@ -128,28 +155,28 @@ export const FloatingAssistantOverlay: React.FC = () => {
             <head>
               <title>Task Flow AI - Display Over Apps</title>
               <style>
+                * { box-sizing: border-box; }
                 body {
                   margin: 0;
-                  padding: 16px;
-                  background: #0A0C14;
-                  color: #F8FAFC;
+                  padding: 14px;
+                  background: ${bgColor};
+                  color: ${textColor};
                   font-family: system-ui, -apple-system, sans-serif;
                   display: flex;
-                  flex-col;
+                  flex-direction: column;
                   height: 100vh;
-                  box-sizing: border-box;
                 }
                 .header {
                   display: flex;
                   align-items: center;
                   justify-content: space-between;
-                  border-bottom: 1px solid #2E3552;
-                  padding-bottom: 10px;
-                  margin-bottom: 12px;
+                  border-bottom: 1px solid ${borderColor};
+                  padding-bottom: 8px;
+                  margin-bottom: 10px;
                 }
                 .title {
                   font-weight: 800;
-                  font-size: 14px;
+                  font-size: 13px;
                   color: #06B6D4;
                   display: flex;
                   align-items: center;
@@ -166,14 +193,57 @@ export const FloatingAssistantOverlay: React.FC = () => {
                 }
                 .content {
                   flex: 1;
-                  background: #131726;
-                  border: 1px solid #2E3552;
+                  background: ${cardBg};
+                  border: 1px solid ${borderColor};
                   border-radius: 12px;
                   padding: 12px;
                   overflow-y: auto;
-                  font-size: 13px;
+                  font-size: 12px;
                   line-height: 1.5;
-                  margin-bottom: 12px;
+                  margin-bottom: 10px;
+                }
+                .chip-group {
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 6px;
+                  margin-bottom: 10px;
+                }
+                .chip {
+                  background: ${cardBg};
+                  border: 1px solid ${borderColor};
+                  color: #7C3AED;
+                  font-size: 10px;
+                  font-weight: bold;
+                  padding: 4px 8px;
+                  border-radius: 8px;
+                  cursor: pointer;
+                  white-space: nowrap;
+                }
+                .chip:hover { border-color: #7C3AED; }
+                .input-box {
+                  display: flex;
+                  gap: 6px;
+                  margin-bottom: 10px;
+                }
+                .input-box input {
+                  flex: 1;
+                  padding: 8px 12px;
+                  border-radius: 10px;
+                  border: 1px solid ${borderColor};
+                  background: ${cardBg};
+                  color: ${textColor};
+                  font-size: 12px;
+                  outline: none;
+                }
+                .input-box button {
+                  padding: 8px 14px;
+                  background: #7C3AED;
+                  color: white;
+                  font-weight: bold;
+                  font-size: 11px;
+                  border: none;
+                  border-radius: 10px;
+                  cursor: pointer;
                 }
                 .mic-btn {
                   width: 100%;
@@ -188,11 +258,11 @@ export const FloatingAssistantOverlay: React.FC = () => {
                   align-items: center;
                   justify-content: center;
                   gap: 8px;
-                  font-size: 14px;
+                  font-size: 13px;
                   box-shadow: 0 0 15px rgba(124, 58, 237, 0.4);
                 }
-                .mic-btn:active { opacity: 0.8; }
-                .hint { font-size: 11px; color: #94A3B8; text-align: center; margin-top: 8px; }
+                .mic-btn:active { opacity: 0.85; }
+                .hint { font-size: 10px; color: #94A3B8; text-align: center; margin-top: 6px; }
               </style>
             </head>
             <body>
@@ -201,26 +271,60 @@ export const FloatingAssistantOverlay: React.FC = () => {
                 <div class="badge">OVERLAY ACTIVE</div>
               </div>
               <div class="content" id="pip-transcript">
-                Welcome to Task Flow AI Display Over Apps mode! You can keep this window on top of other apps while working. Click the microphone below to talk.
+                Welcome to Task Flow AI Display Over Apps mode! Ask questions or give commands below via voice or text.
               </div>
+
+              <div class="chip-group">
+                <button class="chip" id="chip-1">⚡ Daily AI Plan</button>
+                <button class="chip" id="chip-2">📈 Revenue Status</button>
+                <button class="chip" id="chip-3">📝 Create High Priority Task</button>
+              </div>
+
+              <div class="input-box">
+                <input id="pip-input" type="text" placeholder="Type prompt or command..." />
+                <button id="pip-send">Send</button>
+              </div>
+
               <button class="mic-btn" id="pip-mic">
                 🎙️ Speak to AI Assistant
               </button>
-              <div class="hint">Window stays pinned over all active windows</div>
+              <div class="hint">Window stays pinned floating over other apps</div>
             </body>
           </html>
         `;
 
-        // Wire event listener in PiP window
+        // Wire event listeners in PiP window
         const pipMicBtn = pipWin.document.getElementById('pip-mic');
-        const pipText = pipWin.document.getElementById('pip-transcript');
+        const pipInput = pipWin.document.getElementById('pip-input') as HTMLInputElement | null;
+        const pipSendBtn = pipWin.document.getElementById('pip-send');
+        const chip1 = pipWin.document.getElementById('chip-1');
+        const chip2 = pipWin.document.getElementById('chip-2');
+        const chip3 = pipWin.document.getElementById('chip-3');
 
-        if (pipMicBtn && pipText) {
+        if (pipMicBtn) {
           pipMicBtn.onclick = () => {
-            pipText.innerText = 'Listening to your command... Speak now!';
             toggleListening();
           };
         }
+
+        const submitTextFromPip = () => {
+          if (pipInput && pipInput.value.trim()) {
+            const text = pipInput.value.trim();
+            pipInput.value = '';
+            handleVoiceQuery(text);
+          }
+        };
+
+        if (pipSendBtn) pipSendBtn.onclick = submitTextFromPip;
+        if (pipInput) {
+          pipInput.onkeydown = (e: KeyboardEvent) => {
+            if (e.key === 'Enter') submitTextFromPip();
+          };
+        }
+
+        if (chip1) chip1.onclick = () => handleVoiceQuery('Generate AI Daily Plan for my business');
+        if (chip2) chip2.onclick = () => handleVoiceQuery('Show revenue metrics and monthly goal progress');
+        if (chip3) chip3.onclick = () => handleVoiceQuery('Add task: Review proposal and follow up with leads today');
 
         pipWin.addEventListener('unload', () => {
           setIsOverlayModeActive(false);

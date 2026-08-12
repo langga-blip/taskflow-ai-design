@@ -149,20 +149,23 @@ export const TaskManagerScreen: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in overflow-x-hidden max-w-full">
-      {/* Top Header Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className={`text-2xl font-extrabold flex items-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
-            <CheckSquare className="w-6 h-6 text-[#7C3AED]" /> Task Manager
+      {/* Top Header Controls - Centered Add New Task Button with Purple Pulse Glow */}
+      <GlassCard className="flex flex-col items-center justify-center text-center p-6 space-y-4 animate-glow-purple">
+        <div className="flex flex-col items-center justify-center text-center">
+          <h1 className={`text-2xl sm:text-3xl font-extrabold flex items-center justify-center gap-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
+            <CheckSquare className="w-7 h-7 text-[#7C3AED]" /> Task Manager
           </h1>
-          <p className={`text-xs mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+          <p className={`text-xs sm:text-sm mt-1.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
             Prioritized business execution queue • {filteredTasks.length} tasks
           </p>
         </div>
-        <NeonButton onClick={handleOpenNewModal} size="md">
-          <Plus className="w-4 h-4" /> Add New Task
-        </NeonButton>
-      </div>
+
+        <div className="w-full flex items-center justify-center pt-1">
+          <NeonButton onClick={handleOpenNewModal} size="md" className="px-6 py-2.5 shadow-lg">
+            <Plus className="w-4 h-4" /> Add New Task
+          </NeonButton>
+        </div>
+      </GlassCard>
 
       {/* Search & Filter Controls */}
       <GlassCard className="space-y-3 p-4">
@@ -187,41 +190,47 @@ export const TaskManagerScreen: React.FC = () => {
               isLight ? 'bg-slate-100 border-purple-200' : 'bg-[#0A0C14] border-[#2E3552]'
             }`}
           >
-            {(['ALL', 'ACTIVE', 'COMPLETED'] as const).map((status) => (
-              <button
-                key={status}
-                onClick={() => setSelectedStatus(status)}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
-                  selectedStatus === status
-                    ? 'bg-[#7C3AED] text-white'
-                    : isLight
-                    ? 'text-slate-600 hover:text-slate-900'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {status}
-              </button>
-            ))}
+            {(['ALL', 'ACTIVE', 'COMPLETED'] as const).map((status) => {
+              const isActive = selectedStatus === status;
+              return (
+                <button
+                  key={status}
+                  onClick={() => setSelectedStatus(status)}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#7C3AED] text-white shadow-[0_0_12px_rgba(124,58,237,0.4)]'
+                      : isLight
+                      ? 'text-slate-600 hover:text-slate-900'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {status}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Category Pill Filters */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-          {categories.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setSelectedCategory(c.id)}
-              className={`px-3 py-1.5 rounded-xl font-medium transition-colors cursor-pointer whitespace-nowrap ${
-                selectedCategory === c.id
-                  ? 'bg-[#06B6D4] text-black font-bold shadow-[0_0_12px_rgba(6,182,212,0.3)]'
-                  : isLight
-                  ? 'bg-purple-50 text-purple-900 hover:bg-purple-100 border border-purple-200'
-                  : 'bg-[#1E2338] text-slate-400 hover:text-white border border-[#2E3552]'
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {categories.map((c) => {
+            const isActive = selectedCategory === c.id;
+            return (
+              <button
+                key={c.id}
+                onClick={() => setSelectedCategory(c.id)}
+                className={`px-3 py-1.5 rounded-xl font-medium transition-all cursor-pointer whitespace-nowrap ${
+                  isActive
+                    ? 'bg-[#06B6D4] text-black font-bold shadow-[0_0_12px_rgba(6,182,212,0.4)]'
+                    : isLight
+                    ? 'bg-purple-50 text-purple-900 hover:bg-purple-100 border border-purple-200'
+                    : 'bg-[#1E2338] text-slate-400 hover:text-white border border-[#2E3552]'
+                }`}
+              >
+                {c.label}
+              </button>
+            );
+          })}
         </div>
       </GlassCard>
 

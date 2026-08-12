@@ -344,35 +344,38 @@ export const ProfileSettingsScreen: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
           {[
-            { id: 'GEMINI', name: 'Gemini 3.5 Flash', tag: 'Fastest & Recommended', icon: <Sparkles className="w-5 h-5 text-cyan-400" /> },
-            { id: 'OPENAI', name: 'OpenAI GPT-4o', tag: 'Advanced Reasoning', icon: <Cpu className="w-5 h-5 text-purple-400" /> },
-            { id: 'DEEPSEEK', name: 'DeepSeek R1', tag: 'Deep Logic & Math', icon: <Shield className="w-5 h-5 text-emerald-400" /> },
-          ].map((provider) => (
-            <button
-              key={provider.id}
-              type="button"
-              onClick={() => {
-                setAiProvider(provider.id as any);
-                triggerNotification('AI Model Switch', `Switched active provider to ${provider.name}`, 'SYSTEM');
-              }}
-              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
-                aiProvider === provider.id
-                  ? 'bg-[#7C3AED]/20 border-[#7C3AED] shadow-[0_0_15px_rgba(124,58,237,0.3)]'
-                  : isLight
-                  ? 'bg-slate-100 border-slate-300 hover:border-slate-400'
-                  : 'bg-[#0A0C14] border-[#2E3552] hover:border-slate-400'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                {provider.icon}
-                {aiProvider === provider.id && (
-                  <Check className="w-4 h-4 text-[#00E676]" />
-                )}
-              </div>
-              <h3 className="font-bold text-sm mt-2">{provider.name}</h3>
-              <p className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{provider.tag}</p>
-            </button>
-          ))}
+            { id: 'GEMINI', name: 'Gemini 3.5 Flash', tag: 'Fastest & Recommended', icon: <Sparkles className="w-5 h-5 text-blue-400" />, activeClass: 'bg-blue-500/20 border-blue-500 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.35)] animate-glow-blue' },
+            { id: 'OPENAI', name: 'OpenAI GPT-4o', tag: 'Advanced Reasoning', icon: <Cpu className="w-5 h-5 text-purple-400" />, activeClass: 'bg-purple-600/20 border-purple-500 text-purple-400 shadow-[0_0_15px_rgba(124,58,237,0.35)] animate-glow-purple' },
+            { id: 'DEEPSEEK', name: 'DeepSeek R1', tag: 'Deep Logic & Math', icon: <Shield className="w-5 h-5 text-emerald-400" />, activeClass: 'bg-emerald-500/20 border-emerald-500 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.35)] animate-glow-green' },
+          ].map((provider) => {
+            const isSelected = aiProvider === provider.id;
+            return (
+              <button
+                key={provider.id}
+                type="button"
+                onClick={() => {
+                  setAiProvider(provider.id as any);
+                  triggerNotification('AI Model Switch', `Switched active provider to ${provider.name}`, 'SYSTEM');
+                }}
+                className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                  isSelected
+                    ? provider.activeClass
+                    : isLight
+                    ? 'bg-slate-100 border-slate-300 hover:border-slate-400'
+                    : 'bg-[#0A0C14] border-[#2E3552] hover:border-slate-400'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  {provider.icon}
+                  {isSelected && (
+                    <Check className={`w-4 h-4 ${provider.id === 'DEEPSEEK' ? 'text-emerald-400' : provider.id === 'GEMINI' ? 'text-blue-400' : 'text-purple-400'}`} />
+                  )}
+                </div>
+                <h3 className="font-bold text-sm mt-2">{provider.name}</h3>
+                <p className={`text-[10px] mt-0.5 ${isSelected ? 'opacity-90' : isLight ? 'text-slate-500' : 'text-slate-400'}`}>{provider.tag}</p>
+              </button>
+            );
+          })}
         </div>
       </GlassCard>
 

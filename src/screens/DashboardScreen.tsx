@@ -113,7 +113,7 @@ export const DashboardScreen: React.FC = () => {
     <div className="space-y-6 pb-24 animate-fade-in max-w-4xl mx-auto overflow-x-hidden">
       {/* Date & Time Header Bar */}
       <div
-        className={`flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl border shadow-md ${
+        className={`flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl border shadow-md animate-glow-border ${
           isLight
             ? 'bg-gradient-to-r from-purple-50 via-white to-purple-50 border-purple-200 text-slate-800'
             : 'bg-gradient-to-r from-[#131726] via-[#1E2338] to-[#131726] border-[#2E3552] text-slate-200'
@@ -159,7 +159,7 @@ export const DashboardScreen: React.FC = () => {
 
       {/* Greeting Banner */}
       <div
-        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-2xl shadow-xl border ${
+        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-2xl shadow-xl border animate-glow-border ${
           isLight
             ? 'bg-gradient-to-r from-purple-50 via-white to-purple-50 border-purple-200 text-slate-900'
             : 'bg-gradient-to-r from-[#131726] via-[#1E2338] to-[#131726] border-[#2E3552] text-white'
@@ -376,10 +376,10 @@ export const DashboardScreen: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <button
           onClick={() => setCurrentScreen('tasks')}
-          className={`p-4 border rounded-2xl text-left space-y-2 group cursor-pointer transition-all ${
+          className={`p-4 border rounded-2xl text-left space-y-2 group cursor-pointer transition-all animate-glow-purple ${
             isLight
-              ? 'bg-purple-50/70 border-purple-200 hover:bg-purple-100/80 hover:border-purple-300'
-              : 'bg-[#131726] border-[#2E3552] hover:border-[#7C3AED]/50'
+              ? 'bg-purple-50/70 border-purple-300 hover:bg-purple-100/80'
+              : 'bg-[#131726] border-[#7C3AED]/60 hover:border-[#7C3AED]'
           }`}
         >
           <div className="p-2 bg-[#7C3AED]/10 text-[#7C3AED] rounded-xl w-fit group-hover:scale-110 transition-transform">
@@ -391,10 +391,10 @@ export const DashboardScreen: React.FC = () => {
 
         <button
           onClick={() => setCurrentScreen('revenue')}
-          className={`p-4 border rounded-2xl text-left space-y-2 group cursor-pointer transition-all ${
+          className={`p-4 border rounded-2xl text-left space-y-2 group cursor-pointer transition-all animate-glow-green ${
             isLight
-              ? 'bg-emerald-50/70 border-emerald-200 hover:bg-emerald-100/80 hover:border-emerald-300'
-              : 'bg-[#131726] border-[#2E3552] hover:border-[#00E676]/50'
+              ? 'bg-emerald-50/70 border-emerald-300 hover:bg-emerald-100/80'
+              : 'bg-[#131726] border-[#00E676]/60 hover:border-[#00E676]'
           }`}
         >
           <div className="p-2 bg-[#00E676]/10 text-emerald-700 dark:text-[#00E676] rounded-xl w-fit group-hover:scale-110 transition-transform">
@@ -406,13 +406,13 @@ export const DashboardScreen: React.FC = () => {
 
         <button
           onClick={() => setCurrentScreen('workflows')}
-          className={`p-4 border rounded-2xl text-left space-y-2 group cursor-pointer transition-all ${
+          className={`p-4 border rounded-2xl text-left space-y-2 group cursor-pointer transition-all animate-glow-amber ${
             isLight
-              ? 'bg-cyan-50/70 border-cyan-200 hover:bg-cyan-100/80 hover:border-cyan-300'
-              : 'bg-[#131726] border-[#2E3552] hover:border-[#06B6D4]/50'
+              ? 'bg-amber-50/70 border-amber-300 hover:bg-amber-100/80'
+              : 'bg-[#131726] border-[#F59E0B]/60 hover:border-[#F59E0B]'
           }`}
         >
-          <div className="p-2 bg-[#06B6D4]/10 text-cyan-800 dark:text-[#06B6D4] rounded-xl w-fit group-hover:scale-110 transition-transform">
+          <div className="p-2 bg-[#F59E0B]/10 text-amber-600 dark:text-[#F59E0B] rounded-xl w-fit group-hover:scale-110 transition-transform">
             <Layers className="w-5 h-5" />
           </div>
           <h4 className={`font-bold text-sm ${isLight ? 'text-slate-900' : 'text-white'}`}>50+ Workflows</h4>
@@ -421,13 +421,13 @@ export const DashboardScreen: React.FC = () => {
 
         <button
           onClick={() => setCurrentScreen('assistant')}
-          className={`p-4 border rounded-2xl text-left space-y-2 group cursor-pointer transition-all ${
+          className={`p-4 border rounded-2xl text-left space-y-2 group cursor-pointer transition-all animate-glow-cyan ${
             isLight
-              ? 'bg-pink-50/70 border-pink-200 hover:bg-pink-100/80 hover:border-pink-300'
-              : 'bg-[#131726] border-[#2E3552] hover:border-pink-500/50'
+              ? 'bg-cyan-50/70 border-cyan-300 hover:bg-cyan-100/80'
+              : 'bg-[#131726] border-[#06B6D4]/60 hover:border-[#06B6D4]'
           }`}
         >
-          <div className="p-2 bg-pink-500/10 text-pink-600 dark:text-pink-400 rounded-xl w-fit group-hover:scale-110 transition-transform">
+          <div className="p-2 bg-[#06B6D4]/10 text-cyan-700 dark:text-[#06B6D4] rounded-xl w-fit group-hover:scale-110 transition-transform">
             <Bot className="w-5 h-5" />
           </div>
           <h4 className={`font-bold text-sm ${isLight ? 'text-slate-900' : 'text-white'}`}>AI Assistant</h4>

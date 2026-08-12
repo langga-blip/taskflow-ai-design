@@ -187,8 +187,17 @@ export const OnboardingScreen: React.FC = () => {
             </p>
           </div>
 
-          <div className="relative flex items-center justify-center">
-            <span className="bg-[#0A0C14] px-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">or fill manually</span>
+          <div className="relative flex items-center justify-center my-1">
+            <div className={`absolute inset-0 flex items-center ${isLight ? 'border-slate-300' : 'border-slate-700'}`}>
+              <div className={`w-full border-t ${isLight ? 'border-slate-200' : 'border-slate-700/60'}`} />
+            </div>
+            <span
+              className={`relative px-3 text-[10px] uppercase font-bold tracking-wider rounded-full py-0.5 ${
+                isLight ? 'bg-slate-100 text-slate-600 border border-slate-200' : 'bg-[#0A0C14] text-slate-400'
+              }`}
+            >
+              or fill manually
+            </span>
           </div>
 
           <form onSubmit={handleFinishOnboarding} className="space-y-4">
@@ -206,7 +215,7 @@ export const OnboardingScreen: React.FC = () => {
                   placeholder="e.g. Apex Scale Agency"
                   className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                     isLight
-                      ? 'bg-slate-100 border-slate-300 text-slate-900'
+                      ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                       : 'bg-[#0A0C14] border-[#2E3552] text-white'
                   }`}
                 />
@@ -223,7 +232,7 @@ export const OnboardingScreen: React.FC = () => {
                 placeholder="e.g. B2B SaaS, Marketing Agency, E-commerce, Consulting"
                 className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                   isLight
-                    ? 'bg-slate-100 border-slate-300 text-slate-900'
+                    ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                     : 'bg-[#0A0C14] border-[#2E3552] text-white'
                 }`}
               />
@@ -293,7 +302,7 @@ export const OnboardingScreen: React.FC = () => {
                     placeholder="801 234 5678"
                     className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                       isLight
-                        ? 'bg-slate-100 border-slate-300 text-slate-900'
+                        ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                         : 'bg-[#0A0C14] border-[#2E3552] text-white'
                     }`}
                   />
@@ -318,14 +327,16 @@ export const OnboardingScreen: React.FC = () => {
                   placeholder="Enter your account password"
                   className={`w-full border rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                     isLight
-                      ? 'bg-slate-100 border-slate-300 text-slate-900'
+                      ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                       : 'bg-[#0A0C14] border-[#2E3552] text-white'
                   }`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
+                  className={`absolute right-3.5 top-1/2 -translate-y-1/2 cursor-pointer p-0.5 ${
+                    isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
+                  }`}
                   title={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -350,7 +361,7 @@ export const OnboardingScreen: React.FC = () => {
                   onChange={(e) => setTargetRevenue(e.target.value)}
                   className={`w-full border rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-[#7C3AED] ${
                     isLight
-                      ? 'bg-slate-100 border-slate-300 text-slate-900'
+                      ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                       : 'bg-[#0A0C14] border-[#2E3552] text-white'
                   }`}
                 />
@@ -368,7 +379,7 @@ export const OnboardingScreen: React.FC = () => {
                 placeholder="Goal 1: e.g. Scale to $10k MRR"
                 className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-[#06B6D4] ${
                   isLight
-                    ? 'bg-slate-100 border-slate-300 text-slate-900'
+                    ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                     : 'bg-[#0A0C14] border-[#2E3552] text-white'
                 }`}
               />
@@ -379,7 +390,7 @@ export const OnboardingScreen: React.FC = () => {
                 placeholder="Goal 2: e.g. Automate client onboarding"
                 className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-[#06B6D4] ${
                   isLight
-                    ? 'bg-slate-100 border-slate-300 text-slate-900'
+                    ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                     : 'bg-[#0A0C14] border-[#2E3552] text-white'
                 }`}
               />
@@ -390,7 +401,7 @@ export const OnboardingScreen: React.FC = () => {
                 placeholder="Goal 3: e.g. Launch cold email outreach"
                 className={`w-full border rounded-xl px-3.5 py-2 text-xs focus:outline-none focus:border-[#06B6D4] ${
                   isLight
-                    ? 'bg-slate-100 border-slate-300 text-slate-900'
+                    ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                     : 'bg-[#0A0C14] border-[#2E3552] text-white'
                 }`}
               />

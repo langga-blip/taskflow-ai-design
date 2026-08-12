@@ -100,9 +100,9 @@ export const RevenueDashboardScreen: React.FC = () => {
   return (
     <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in overflow-x-hidden max-w-full">
       {/* Header Banner */}
-      <GlassCard className={`border ${
+      <GlassCard className={`border animate-glow-green ${
         isLight
-          ? 'bg-gradient-to-br from-emerald-50/80 via-white to-emerald-100/40 border-emerald-200 text-slate-900 shadow-sm'
+          ? 'bg-gradient-to-br from-emerald-50/80 via-white to-emerald-100/40 border-emerald-300 text-slate-900 shadow-sm'
           : 'border-[#00E676]/40 bg-gradient-to-br from-[#131726] via-[#131726] to-[#1E2338] text-white'
       }`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

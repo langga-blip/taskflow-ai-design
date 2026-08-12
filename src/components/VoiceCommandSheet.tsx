@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { X, Mic, Sparkles, Send, Check, Bookmark, Disc, Square, Volume2 } from 'lucide-react';
 import { NeonButton } from './NeonButton';
+import { createVoiceRecognizer, speakWithAlexaVoice, VoiceRecognizerController } from '../utils/speechUtils';
 
 export const VoiceCommandSheet: React.FC = () => {
   const { isVoiceSheetOpen, setIsVoiceSheetOpen, saveTask, setCurrentScreen, triggerNotification, userProfile } = useApp();
@@ -10,8 +11,7 @@ export const VoiceCommandSheet: React.FC = () => {
   const [isListening, setIsListening] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
 
-  const recognitionRef = useRef<any>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const recognizerControllerRef = useRef<VoiceRecognizerController | null>(null);
 
   useEffect(() => {
     let interval: any = null;
@@ -28,13 +28,8 @@ export const VoiceCommandSheet: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {}
-      }
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      if (recognizerControllerRef.current) {
+        recognizerControllerRef.current.stop();
       }
     };
   }, []);
@@ -52,6 +47,8 @@ export const VoiceCommandSheet: React.FC = () => {
   const handleExecuteCommand = (textToRun?: string) => {
     const query = (textToRun || commandText).trim();
     if (!query) return;
+
+    speakWithAlexaVoice(`Processing command: ${query}`);
 
     const lower = query.toLowerCase();
 
@@ -82,6 +79,7 @@ export const VoiceCommandSheet: React.FC = () => {
 
   const handleSaveVoiceNote = () => {
     const textToSave = commandText.trim() || 'Recorded Voice Note Task';
+    speakWithAlexaVoice(`Saved voice note: ${textToSave}`);
     saveTask({
       title: `🎙️ Voice Note: ${textToSave}`,
       category: 'GENERAL',
@@ -101,14 +99,8 @@ export const VoiceCommandSheet: React.FC = () => {
           navigator.vibrate([30, 40, 30]);
         } catch (e) {}
       }
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {}
-      }
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-        mediaStreamRef.current = null;
+      if (recognizerControllerRef.current) {
+        recognizerControllerRef.current.stop();
       }
       setIsListening(false);
       return;
@@ -120,75 +112,24 @@ export const VoiceCommandSheet: React.FC = () => {
       } catch (e) {}
     }
 
-    // Request microphone stream without blocking recognition start
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices
-        .getUserMedia({ audio: true })
-        .then((stream) => {
-          mediaStreamRef.current = stream;
-        })
-        .catch((err) => {
-          console.warn('Microphone permission notice:', err);
-        });
-    }
-
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = (event: any) => {
-          let accumulated = '';
-          for (let i = 0; i < event.results.length; i++) {
-            accumulated += event.results[i][0].transcript;
-          }
-          if (accumulated.trim()) {
-            setCommandText(accumulated);
-          }
-        };
-
-        recognition.onerror = (err: any) => {
-          console.warn('Speech recognition error notice:', err);
-        };
-
-        recognition.onend = () => {
-          setIsListening(false);
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
-        setIsListening(true);
-        triggerNotification('Listening for Voice Command', 'Microphone active. Speak your command now...', 'SYSTEM');
-        return;
-      } catch (e) {
-        console.warn('Failed starting native speech recognition, falling back to dictation engine', e);
-      }
-    }
-
-    // Fallback dictation simulation for environments with restricted speech recognition
     setIsListening(true);
-    const samples = [
-      'Add task: Schedule high-ticket client strategy call today',
-      'Generate AI Daily Plan to optimize workflow revenue',
-      'Open Revenue Dashboard to track monthly target',
-      'Ask AI: How to scale agency profit margins efficiently?',
-    ];
-    const targetSample = samples[Math.floor(Math.random() * samples.length)];
+    triggerNotification('Listening for Voice 🎙️', 'Speak your words into the microphone now...', 'SYSTEM');
 
-    let currentIdx = 0;
-    const interval = setInterval(() => {
-      currentIdx += 3;
-      setCommandText(targetSample.slice(0, currentIdx));
-      if (currentIdx >= targetSample.length) {
-        clearInterval(interval);
+    const controller = createVoiceRecognizer(
+      (transcribedText) => {
+        setCommandText(transcribedText);
+      },
+      (errorMsg) => {
+        triggerNotification('Microphone Notice', errorMsg, 'SYSTEM');
         setIsListening(false);
-        triggerNotification('Voice Transcribed', `Transcribed voice query: "${targetSample}"`, 'AI');
+      },
+      () => {
+        setIsListening(false);
       }
-    }, 150);
+    );
+
+    recognizerControllerRef.current = controller;
+    await controller.start();
   };
 
   const formatTime = (secs: number) => {

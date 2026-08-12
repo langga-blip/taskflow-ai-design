@@ -2,7 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { NeonButton } from '../components/NeonButton';
-import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Mic, MicOff, Wand2 } from 'lucide-react';
+import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Mic, MicOff, Wand2, Volume2 } from 'lucide-react';
+import { createVoiceRecognizer, speakWithAlexaVoice, VoiceRecognizerController } from '../utils/speechUtils';
+import { autoCorrectText } from '../utils/autoCorrect';
 
 interface ChatMessage {
   id: string;
@@ -25,14 +27,40 @@ export const AiAssistantScreen: React.FC = () => {
   const { userProfile, aiProvider, setAiProvider, askAssistant, triggerNotification } = useApp();
   const isLight = userProfile.themeMode === 'Light';
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      sender: 'assistant',
-      text: `Hello ${userProfile.userName || 'Executive'}! 👋 I am your 24/7 Executive AI Business Assistant.\n\nI am actively monitoring your **Google Drive, Calendar, and Gmail** (${userProfile.userEmail || 'Connected'}).\n\nHow can I assist you with scaling **${userProfile.businessName}** today?\n\n• **Gmail Smart Response**: AI detected incoming client inquiries with automated high-converting replies.\n• **Proposal Generator**: Draft high-converting client retainer proposals.\n• **Revenue Optimization**: Action plans to reach your **${userProfile.currencySymbol}${(userProfile.monthlyRevenueGoal || 10000).toLocaleString()}** goal.`,
-      timestamp: 'Just now',
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('tf_ai_chat_messages');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
+        } catch (e) {
+          /* ignore error and fallback */
+        }
+      }
+    }
+    return [
+      {
+        id: '1',
+        sender: 'assistant',
+        text: `Hello ${userProfile.userName || 'Executive'}! 👋 I am your 24/7 Executive AI Business Assistant.\n\nI am actively monitoring your **Google Drive, Calendar, and Gmail** (${userProfile.userEmail || 'Connected'}).\n\nHow can I assist you with scaling **${userProfile.businessName}** today?\n\n• **Gmail Smart Response**: AI detected incoming client inquiries with automated high-converting replies.\n• **Proposal Generator**: Draft high-converting client retainer proposals.\n• **Revenue Optimization**: Action plans to reach your **${userProfile.currencySymbol}${(userProfile.monthlyRevenueGoal || 10000).toLocaleString()}** goal.`,
+        timestamp: 'Just now',
+      },
+    ];
+  });
+
+  // Automatically save messages to localStorage on every change
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('tf_ai_chat_messages', JSON.stringify(messages));
+      } catch (e) {
+        /* ignore */
+      }
+    }
+  }, [messages]);
 
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -57,14 +85,12 @@ export const AiAssistantScreen: React.FC = () => {
   const [showConfirmSendModal, setShowConfirmSendModal] = useState(false);
   const [emailSentSuccess, setEmailSentSuccess] = useState(false);
   const [isListeningVoice, setIsListeningVoice] = useState(false);
-  const voiceRecognitionRef = useRef<any>(null);
+  const voiceControllerRef = useRef<VoiceRecognizerController | null>(null);
 
   const toggleVoiceInput = async () => {
     if (isListeningVoice) {
-      if (voiceRecognitionRef.current) {
-        try {
-          voiceRecognitionRef.current.stop();
-        } catch (e) {}
+      if (voiceControllerRef.current) {
+        voiceControllerRef.current.stop();
       }
       setIsListeningVoice(false);
       return;
@@ -76,186 +102,24 @@ export const AiAssistantScreen: React.FC = () => {
       } catch (e) {}
     }
 
-    // Request mic non-blocking
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {});
-    }
-
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = (event: any) => {
-          let accumulated = '';
-          for (let i = 0; i < event.results.length; i++) {
-            accumulated += event.results[i][0].transcript;
-          }
-          if (accumulated.trim()) {
-            setInputText(accumulated);
-          }
-        };
-
-        recognition.onerror = (err: any) => {
-          console.warn('Speech recognition notice:', err);
-        };
-
-        recognition.onend = () => {
-          setIsListeningVoice(false);
-        };
-
-        voiceRecognitionRef.current = recognition;
-        recognition.start();
-        setIsListeningVoice(true);
-        triggerNotification('Voice Input Active', 'Speak your query to the AI Assistant...', 'SYSTEM');
-        return;
-      } catch (e) {
-        console.warn('Failed starting native speech recognition, falling back to dictation', e);
-      }
-    }
-
     setIsListeningVoice(true);
-    const voiceSamples = [
-      'How can I increase my monthly recurring revenue to $20k?',
-      'Analyze my current high-priority tasks and optimize schedule',
-      'Draft a follow-up email for high-ticket retainer client',
-    ];
-    const sample = voiceSamples[Math.floor(Math.random() * voiceSamples.length)];
-    let currentIdx = 0;
-    const interval = setInterval(() => {
-      currentIdx += 3;
-      setInputText(sample.slice(0, currentIdx));
-      if (currentIdx >= sample.length) {
-        clearInterval(interval);
+    triggerNotification('Voice Input Active 🎙️', 'Speak your query clearly into the microphone...', 'SYSTEM');
+
+    const controller = createVoiceRecognizer(
+      (transcribedText) => {
+        setInputText(transcribedText);
+      },
+      (errorMsg) => {
+        triggerNotification('Microphone Notice', errorMsg, 'SYSTEM');
         setIsListeningVoice(false);
-        triggerNotification('Voice Input Captured', `Captured voice query: "${sample}"`, 'AI');
+      },
+      () => {
+        setIsListeningVoice(false);
       }
-    }, 150);
-  };
+    );
 
-  const autoCorrectText = (input: string): string => {
-    if (!input || !input.trim()) return input;
-    let text = input;
-
-    // Comprehensive Dictionary for typos, misspellings, contractions, and acronyms
-    const dictionary: Record<string, string> = {
-      // Contractions & shortcuts
-      im: "I'm",
-      cant: "can't",
-      dont: "don't",
-      isnt: "isn't",
-      wont: "won't",
-      didnt: "didn't",
-      couldnt: "couldn't",
-      wouldnt: "wouldn't",
-      shouldnt: "shouldn't",
-      havent: "haven't",
-      hasnt: "hasn't",
-      youre: "you're",
-      theyre: "they're",
-      weve: "we've",
-      ill: "I'll",
-      youll: "you'll",
-      whats: "what's",
-      hows: "how's",
-      pls: 'please',
-      plx: 'please',
-      plz: 'please',
-      hw: 'how',
-      ur: 'your',
-      r: 'are',
-      u: 'you',
-      thx: 'thanks',
-      ty: 'thank you',
-      bcz: 'because',
-      bc: 'because',
-
-      // Common typos & misspellings
-      teh: 'the',
-      taht: 'that',
-      thier: 'their',
-      receive: 'receive',
-      receiv: 'receive',
-      recieve: 'receive',
-      recep: 'receipt',
-      calender: 'calendar',
-      seperate: 'separate',
-      recomend: 'recommend',
-      recomended: 'recommended',
-      sucess: 'success',
-      succesful: 'successful',
-      bussiness: 'business',
-      busines: 'business',
-      bisness: 'business',
-      proposall: 'proposal',
-      propsal: 'proposal',
-      porposal: 'proposal',
-      impliment: 'implement',
-      implimentation: 'implementation',
-      agnecy: 'agency',
-      agencys: 'agencies',
-      revenuee: 'revenue',
-      revenu: 'revenue',
-      sechedule: 'schedule',
-      skedule: 'schedule',
-      tomorow: 'tomorrow',
-      tommorrow: 'tomorrow',
-      clientt: 'client',
-      clien: 'client',
-      helpp: 'help',
-      shoud: 'should',
-      sholud: 'should',
-      woudl: 'would',
-      feauture: 'feature',
-      fature: 'feature',
-      optmize: 'optimize',
-      opimization: 'optimization',
-      analys: 'analysis',
-      stratgy: 'strategy',
-      marcketing: 'marketing',
-      marketting: 'marketing',
-      automat: 'automate',
-      workfow: 'workflow',
-      workflo: 'workflow',
-      taks: 'tasks',
-      tsak: 'task',
-      asistant: 'assistant',
-      asistantt: 'assistant',
-      mrr: 'MRR',
-      arr: 'ARR',
-      ai: 'AI',
-      usd: 'USD',
-      ngn: 'NGN',
-      crm: 'CRM',
-      roi: 'ROI',
-      kpi: 'KPI',
-    };
-
-    Object.entries(dictionary).forEach(([bad, good]) => {
-      const regex = new RegExp(`\\b${bad}\\b`, 'gi');
-      text = text.replace(regex, (match) => {
-        if (match === match.toUpperCase() && match.length > 1) {
-          return good.toUpperCase();
-        }
-        if (match.charAt(0) === match.charAt(0).toUpperCase()) {
-          return good.charAt(0).toUpperCase() + good.slice(1);
-        }
-        return good;
-      });
-    });
-
-    text = text.replace(/\s+/g, ' ').trim();
-    if (text.length > 0) {
-      text = text.charAt(0).toUpperCase() + text.slice(1);
-      if (!/[.!?]$/.test(text)) {
-        text += '?';
-      }
-    }
-    return text;
+    voiceControllerRef.current = controller;
+    await controller.start();
   };
 
   const handleAutoCorrect = () => {
@@ -287,14 +151,19 @@ export const AiAssistantScreen: React.FC = () => {
   };
 
   const handleClearHistory = () => {
-    setMessages([
+    const cleared: ChatMessage[] = [
       {
         id: Date.now().toString(),
         sender: 'assistant',
         text: `Chat cleared! How else can I assist **${userProfile.businessName}** today?`,
         timestamp: 'Just now',
       },
-    ]);
+    ];
+    setMessages(cleared);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tf_ai_chat_messages', JSON.stringify(cleared));
+    }
+    triggerNotification('Chat History Cleared 🧹', 'AI Assistant conversation has been reset.', 'AI');
   };
 
   const handleSendMessage = async (customText?: string) => {
@@ -419,9 +288,9 @@ export const AiAssistantScreen: React.FC = () => {
     <div className="space-y-4 pb-6 max-w-4xl mx-auto flex flex-col animate-fade-in overflow-x-hidden w-full">
       {/* Header Banner */}
       <GlassCard
-        className={`p-4 flex-shrink-0 border ${
+        className={`p-4 flex-shrink-0 border animate-glow-cyan ${
           isLight
-            ? 'bg-gradient-to-r from-purple-50 via-white to-purple-50 border-purple-200'
+            ? 'bg-gradient-to-r from-purple-50 via-white to-purple-50 border-cyan-300'
             : 'bg-gradient-to-r from-[#131726] via-[#1E2338] to-[#131726] border-[#06B6D4]/40'
         }`}
       >
@@ -450,18 +319,8 @@ export const AiAssistantScreen: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => {
-                if ('documentPictureInPicture' in window) {
-                  try {
-                    (window as any).documentPictureInPicture.requestWindow({
-                      width: 380,
-                      height: 520,
-                    });
-                  } catch (e) {
-                    triggerNotification('Overlay Assistant Active', 'Keep talking to Task Flow AI in floating widget mode!', 'AI');
-                  }
-                } else {
-                  triggerNotification('Overlay Assistant Active', 'Floating Assistant Widget enabled for multi-app usage.', 'AI');
-                }
+                window.dispatchEvent(new CustomEvent('launch-overlay-pip'));
+                triggerNotification('Overlay Assistant Active', 'Keep talking to Task Flow AI in floating widget mode!', 'AI');
               }}
               className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors ${
                 isLight
@@ -689,8 +548,8 @@ export const AiAssistantScreen: React.FC = () => {
           {messages.map((m) => (
             <div
               key={m.id}
-              className={`flex items-start gap-3 ${
-                m.sender === 'user' ? 'flex-row-reverse' : 'flex-row'
+              className={`flex items-start gap-3 w-full ${
+                m.sender === 'user' ? 'flex-row-reverse justify-start' : 'flex-row justify-start'
               }`}
             >
               <div
@@ -706,12 +565,12 @@ export const AiAssistantScreen: React.FC = () => {
               </div>
 
               <div
-                className={`max-w-[88%] sm:max-w-[82%] rounded-2xl p-4 text-xs sm:text-sm ${
+                className={`max-w-[85%] sm:max-w-[80%] rounded-2xl p-4 text-xs sm:text-sm ${
                   m.sender === 'user'
-                    ? 'bg-[#7C3AED] text-white rounded-tr-none shadow-md'
+                    ? 'bg-[#7C3AED] text-white rounded-tr-none shadow-md ml-auto text-left'
                     : isLight
-                    ? 'bg-white text-slate-900 border border-purple-200 rounded-tl-none shadow-md space-y-2'
-                    : 'bg-[#181D30] text-slate-100 border border-[#2E3552] rounded-tl-none space-y-2 shadow-lg'
+                    ? 'bg-white text-slate-900 border border-purple-200 rounded-tl-none shadow-md space-y-2 mr-auto text-left'
+                    : 'bg-[#181D30] text-slate-100 border border-[#2E3552] rounded-tl-none space-y-2 shadow-lg mr-auto text-left'
                 }`}
               >
                 {m.sender === 'assistant' ? (
@@ -724,26 +583,42 @@ export const AiAssistantScreen: React.FC = () => {
                   <span>{m.timestamp}</span>
 
                   {m.sender === 'assistant' && (
-                    <button
-                      onClick={() => handleCopy(m.id, m.text)}
-                      className={`flex items-center gap-1 font-semibold transition-colors cursor-pointer ${
-                        copiedId === m.id
-                          ? 'text-emerald-400'
-                          : isLight
-                          ? 'text-purple-600 hover:text-purple-900'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      {copiedId === m.id ? (
-                        <>
-                          <Check className="w-3 h-3" /> Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" /> Copy Response
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => speakWithAlexaVoice(m.text)}
+                        className={`flex items-center gap-1 font-semibold transition-colors cursor-pointer ${
+                          isLight
+                            ? 'text-purple-600 hover:text-purple-900'
+                            : 'text-[#06B6D4] hover:text-cyan-300'
+                        }`}
+                        title="Listen in Amazon Alexa AI Voice"
+                      >
+                        <Volume2 className="w-3 h-3" /> Speak
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(m.id, m.text)}
+                        className={`flex items-center gap-1 font-semibold transition-colors cursor-pointer ${
+                          copiedId === m.id
+                            ? 'text-emerald-400'
+                            : isLight
+                            ? 'text-purple-600 hover:text-purple-900'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {copiedId === m.id ? (
+                          <>
+                            <Check className="w-3 h-3" /> Copied!
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" /> Copy
+                          </>
+                        )}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -767,7 +642,7 @@ export const AiAssistantScreen: React.FC = () => {
       </GlassCard>
 
       {/* Quick Prompt Shortcuts */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs flex-shrink-0">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs flex-shrink-0 touch-pan-x">
         {quickPrompts.map((p, idx) => (
           <button
             key={idx}

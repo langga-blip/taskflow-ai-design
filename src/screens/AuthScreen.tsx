@@ -314,7 +314,7 @@ export const AuthScreen: React.FC = () => {
                       }
                       className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                         isLight
-                          ? 'bg-slate-100 border-slate-300 text-slate-900'
+                          ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                           : 'bg-[#0A0C14] border-[#2E3552] text-white'
                       }`}
                     />
@@ -363,7 +363,7 @@ export const AuthScreen: React.FC = () => {
                       placeholder="849201"
                       className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm tracking-widest font-mono focus:outline-none focus:border-[#7C3AED] ${
                         isLight
-                          ? 'bg-slate-100 border-slate-300 text-slate-900'
+                          ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                           : 'bg-[#0A0C14] border-[#2E3552] text-white'
                       }`}
                     />
@@ -408,14 +408,16 @@ export const AuthScreen: React.FC = () => {
                       placeholder="Enter new password"
                       className={`w-full border rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                         isLight
-                          ? 'bg-slate-100 border-slate-300 text-slate-900'
+                          ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                           : 'bg-[#0A0C14] border-[#2E3552] text-white'
                       }`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
+                      className={`absolute right-3.5 top-1/2 -translate-y-1/2 cursor-pointer p-0.5 ${
+                        isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
+                      }`}
                       title={showNewPassword ? 'Hide password' : 'Show password'}
                     >
                       {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -436,14 +438,16 @@ export const AuthScreen: React.FC = () => {
                       placeholder="Confirm new password"
                       className={`w-full border rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                         isLight
-                          ? 'bg-slate-100 border-slate-300 text-slate-900'
+                          ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                           : 'bg-[#0A0C14] border-[#2E3552] text-white'
                       }`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
+                      className={`absolute right-3.5 top-1/2 -translate-y-1/2 cursor-pointer p-0.5 ${
+                        isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
+                      }`}
                       title={showConfirmPassword ? 'Hide password' : 'Show password'}
                     >
                       {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -487,7 +491,7 @@ export const AuthScreen: React.FC = () => {
                         placeholder="Alex Rivera"
                         className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                           isLight
-                            ? 'bg-slate-100 border-slate-300 text-slate-900'
+                            ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                             : 'bg-[#0A0C14] border-[#2E3552] text-white'
                         }`}
                       />
@@ -558,7 +562,7 @@ export const AuthScreen: React.FC = () => {
                           placeholder="801 234 5678"
                           className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                             isLight
-                              ? 'bg-slate-100 border-slate-300 text-slate-900'
+                              ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                               : 'bg-[#0A0C14] border-[#2E3552] text-white'
                           }`}
                         />
@@ -570,7 +574,7 @@ export const AuthScreen: React.FC = () => {
                   <div
                     className={`p-3 rounded-xl border text-[11px] space-y-1.5 ${
                       isLight
-                        ? 'bg-slate-100 border-slate-200 text-slate-700'
+                        ? 'bg-purple-50/80 border-purple-200 text-slate-800'
                         : 'bg-[#0A0C14] border-[#2E3552] text-slate-300'
                     }`}
                   >
@@ -599,8 +603,8 @@ export const AuthScreen: React.FC = () => {
                         <span className="font-semibold">{selectedCountry.timezone}</span>
                       </div>
                       <div className="col-span-2 flex items-center gap-1 pt-0.5 border-t border-slate-700/30">
-                        <span className="text-slate-400">Password:</span>{' '}
-                        <span className="font-mono font-bold text-[#A78BFA]">
+                        <span className={isLight ? 'text-slate-600' : 'text-slate-400'}>Password:</span>{' '}
+                        <span className="font-mono font-bold text-[#7C3AED] dark:text-[#A78BFA]">
                           {password ? (showPassword ? password : '••••••••••••') : 'Not set yet'}
                         </span>
                       </div>
@@ -622,7 +626,7 @@ export const AuthScreen: React.FC = () => {
                     placeholder="alex@apexscale.com"
                     className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                       isLight
-                        ? 'bg-slate-100 border-slate-300 text-slate-900'
+                        ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                         : 'bg-[#0A0C14] border-[#2E3552] text-white'
                     }`}
                   />
@@ -653,14 +657,16 @@ export const AuthScreen: React.FC = () => {
                     placeholder="••••••••••••"
                     className={`w-full border rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                       isLight
-                        ? 'bg-slate-100 border-slate-300 text-slate-900'
+                        ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                         : 'bg-[#0A0C14] border-[#2E3552] text-white'
                     }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
+                    className={`absolute right-3.5 top-1/2 -translate-y-1/2 cursor-pointer p-0.5 ${
+                      isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
+                    }`}
                     title={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

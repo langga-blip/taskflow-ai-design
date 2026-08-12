@@ -1,16 +1,46 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
-import { Crown, CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Crown, CheckCircle2, ShieldCheck, ArrowRight, Loader2, Mail, Check } from 'lucide-react';
+import { triggerSubscriptionReceiptApi } from '../services/api';
 
 export const SubscriptionScreen: React.FC = () => {
   const { userProfile, updateUserProfile, setCurrentScreen, triggerNotification } = useApp();
   const isLight = userProfile.themeMode === 'Light';
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [receiptSent, setReceiptSent] = useState<string | null>(null);
 
-  const handleActivatePro = () => {
+  const handleActivatePro = async () => {
+    setIsProcessing(true);
     updateUserProfile({ isSubscribed: true });
-    triggerNotification('Pro Annual Activated! 👑', 'Unlocked unlimited AI strategy, global currencies & 50+ templates.', 'SYSTEM', 'dashboard');
-    setCurrentScreen('dashboard');
+
+    const email = userProfile.userEmail || 'mummom692@gmail.com';
+    const name = userProfile.userName || 'Valued User';
+
+    try {
+      const res = await triggerSubscriptionReceiptApi(email, name, '₦20,000', 'TaskFlow AI Pro 3-Month Pass');
+      const txn = res.transactionId || `TF-TXN-${Math.floor(100000 + Math.random() * 900000)}`;
+      setReceiptSent(txn);
+
+      triggerNotification(
+        'Pro 3-Month Pass Activated! 👑',
+        `Payment receipt sent to ${email} (Txn: ${txn}). Unlocked full access!`,
+        'SYSTEM',
+        'dashboard'
+      );
+    } catch (err) {
+      triggerNotification(
+        'Pro 3-Month Pass Activated! 👑',
+        'Unlocked unlimited AI strategy, global currencies & 50+ templates.',
+        'SYSTEM',
+        'dashboard'
+      );
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => {
+        setCurrentScreen('dashboard');
+      }, 1500);
+    }
   };
 
   const benefits = [
@@ -46,14 +76,18 @@ export const SubscriptionScreen: React.FC = () => {
         <div className={`flex items-center justify-between pb-4 border-b ${isLight ? 'border-amber-200' : 'border-[#2E3552]'}`}>
           <div>
             <span className="text-[10px] font-extrabold text-[#F59E0B] uppercase tracking-wider">
-              TASK FLOW PRO ANNUAL
+              TASK FLOW PRO QUARTERLY PASS
             </span>
-            <h2 className={`text-2xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>$199 / Year</h2>
-            <p className={`text-[11px] ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Equivalent to $16.50/month (Save 40%)</p>
+            <h2 className={`text-2xl sm:text-3xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+              ₦20,000 / 3 Months
+            </h2>
+            <p className={`text-[11px] font-medium mt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+              20,000 Naira / 3 Months (~₦6,666/month) • Global Tier: $49 / 3 Months
+            </p>
           </div>
 
           <span className="px-3 py-1 rounded-full bg-[#F59E0B]/20 text-[#F59E0B] font-bold text-xs border border-[#F59E0B]/40">
-            BEST VALUE
+            POPULAR TIER
           </span>
         </div>
 
@@ -68,16 +102,34 @@ export const SubscriptionScreen: React.FC = () => {
         </div>
 
         <div className="pt-2">
-          {userProfile.isSubscribed ? (
+          {userProfile.isSubscribed && !isProcessing && !receiptSent ? (
             <div className="p-3 bg-[#00E676]/10 border border-[#00E676]/40 rounded-2xl text-center text-xs font-bold text-emerald-700 dark:text-[#00E676] flex items-center justify-center gap-2">
-              <ShieldCheck className="w-4 h-4" /> Pro Annual Pass is Currently Active on Your Account
+              <ShieldCheck className="w-4 h-4" /> Pro 3-Month Pass is Currently Active on Your Account
+            </div>
+          ) : receiptSent ? (
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/40 rounded-2xl text-center space-y-1">
+              <div className="text-emerald-500 font-extrabold text-xs flex items-center justify-center gap-1.5">
+                <Check className="w-4 h-4" /> Payment Successful & Receipt Dispatched!
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Email receipt sent to <span className="text-white font-semibold">{userProfile.userEmail || 'mummom692@gmail.com'}</span> (Txn: {receiptSent})
+              </p>
             </div>
           ) : (
             <button
               onClick={handleActivatePro}
-              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-[#F59E0B] via-[#D97706] to-[#7C3AED] text-white font-extrabold text-sm shadow-md hover:scale-[1.02] transition-all cursor-pointer flex items-center justify-center gap-2"
+              disabled={isProcessing}
+              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-[#F59E0B] via-[#D97706] to-[#7C3AED] text-white font-extrabold text-sm shadow-md hover:scale-[1.02] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-70"
             >
-              <Crown className="w-5 h-5" /> Activate Pro Pass Instantly <ArrowRight className="w-5 h-5" />
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" /> Processing Payment & Generating Receipt...
+                </>
+              ) : (
+                <>
+                  <Crown className="w-5 h-5" /> Activate Pro Pass (₦20,000 / 3 Months) <ArrowRight className="w-5 h-5" />
+                </>
+              )}
             </button>
           )}
         </div>

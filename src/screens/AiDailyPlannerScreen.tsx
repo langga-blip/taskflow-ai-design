@@ -50,9 +50,9 @@ export const AiDailyPlannerScreen: React.FC = () => {
     <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in overflow-x-hidden max-w-full">
       {/* Header Banner */}
       <GlassCard
-        className={`border ${
+        className={`border animate-glow-cyan ${
           isLight
-            ? 'bg-gradient-to-br from-purple-50 via-white to-purple-50 border-purple-200'
+            ? 'bg-gradient-to-br from-purple-50 via-white to-purple-50 border-cyan-300'
             : 'border-[#06B6D4]/40 bg-gradient-to-br from-[#131726] via-[#131726] to-[#1E2338]'
         }`}
       >

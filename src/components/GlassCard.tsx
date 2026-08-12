@@ -22,9 +22,12 @@ export const GlassCard: React.FC<GlassCardProps> = ({
     isLight = typeof document !== 'undefined' && document.documentElement.classList.contains('light');
   }
 
+  const hasSpecificGlow = className.includes('animate-glow-');
+  const defaultGlowClass = hasSpecificGlow ? '' : 'animate-glow-border';
+
   const baseThemeClasses = isLight
-    ? 'bg-white/95 backdrop-blur-xl border border-slate-200 text-slate-900 shadow-sm'
-    : 'bg-[#131726]/90 backdrop-blur-xl border border-[#2E3552] text-white shadow-xl';
+    ? `bg-white/95 backdrop-blur-xl border border-slate-200/90 text-slate-900 shadow-sm ${defaultGlowClass}`
+    : `bg-[#131726]/90 backdrop-blur-xl border border-[#2E3552] text-white shadow-xl ${defaultGlowClass}`;
 
   const hoverClasses = hoverEffect
     ? isLight

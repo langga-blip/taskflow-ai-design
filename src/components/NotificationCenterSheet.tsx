@@ -98,7 +98,7 @@ export const NotificationCenterSheet: React.FC = () => {
 
         {/* Action Toolbar */}
         <div className="flex items-center justify-between my-4 gap-2 text-xs">
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex flex-wrap items-center gap-1">
             {categories.map((cat) => (
               <button
                 key={cat.id}

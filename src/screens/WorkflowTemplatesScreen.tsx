@@ -36,10 +36,10 @@ export const WorkflowTemplatesScreen: React.FC = () => {
     <div className="space-y-6 pb-24 max-w-4xl mx-auto animate-fade-in overflow-x-hidden max-w-full">
       {/* Header Banner */}
       <GlassCard
-        className={`border ${
+        className={`border animate-glow-amber ${
           isLight
-            ? 'bg-gradient-to-br from-purple-50 via-white to-purple-50 border-purple-200'
-            : 'border-[#A78BFA]/40 bg-gradient-to-br from-[#131726] via-[#131726] to-[#1E2338]'
+            ? 'bg-gradient-to-br from-purple-50 via-white to-purple-50 border-amber-300/80'
+            : 'border-[#F59E0B]/40 bg-gradient-to-br from-[#131726] via-[#131726] to-[#1E2338]'
         }`}
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -75,22 +75,25 @@ export const WorkflowTemplatesScreen: React.FC = () => {
       </GlassCard>
 
       {/* Category Filter Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs">
-        {categories.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => setSelectedCategory(c.id)}
-            className={`px-3.5 py-2 rounded-xl font-semibold transition-all cursor-pointer whitespace-nowrap border ${
-              selectedCategory === c.id
-                ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-[0_0_15px_rgba(124,58,237,0.4)]'
-                : isLight
-                ? 'bg-white text-slate-700 hover:text-purple-900 border-purple-200'
-                : 'bg-[#131726] text-slate-400 hover:text-white border-[#2E3552]'
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        {categories.map((c) => {
+          const isActive = selectedCategory === c.id;
+          return (
+            <button
+              key={c.id}
+              onClick={() => setSelectedCategory(c.id)}
+              className={`px-3.5 py-2 rounded-xl font-semibold transition-all cursor-pointer whitespace-nowrap border ${
+                isActive
+                  ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-[0_0_15px_rgba(124,58,237,0.4)]'
+                  : isLight
+                  ? 'bg-white text-slate-700 hover:text-purple-900 border-purple-200'
+                  : 'bg-[#131726] text-slate-400 hover:text-white border-[#2E3552]'
+              }`}
+            >
+              {c.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Template Grid */}
