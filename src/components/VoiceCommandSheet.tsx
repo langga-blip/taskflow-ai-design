@@ -71,14 +71,15 @@ export const VoiceCommandSheet: React.FC = () => {
         dueDate: 'Today',
       });
       triggerNotification('Task Created', `Added "${taskTitle}" to Task Manager`, 'SYSTEM', 'tasks');
-    } else if (lower.includes('plan') || lower.includes('daily')) {
+    } else if (lower.includes('plan') || lower.includes('daily plan')) {
       setCurrentScreen('planner');
     } else if (lower.includes('revenue') || lower.includes('income')) {
       setCurrentScreen('revenue');
     } else if (lower.includes('template') || lower.includes('workflow')) {
       setCurrentScreen('workflows');
     } else {
-      // Default jump to AI Assistant
+      // Dispatch execute prompt event and switch to AI Assistant screen
+      window.dispatchEvent(new CustomEvent('execute-ai-prompt', { detail: { prompt: query } }));
       setCurrentScreen('assistant');
     }
 
@@ -129,7 +130,15 @@ export const VoiceCommandSheet: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          if (isListening) stopRecording();
+          setIsVoiceSheetOpen(false);
+        }
+      }}
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+    >
       <div
         className={`w-full max-w-lg max-h-[85vh] rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4 overflow-y-auto scrollbar-none my-auto border transition-colors ${
           isLight

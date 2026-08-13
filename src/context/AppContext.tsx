@@ -364,10 +364,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const hour = new Date().getHours();
     const name = userProfile.userName || userProfile.businessName || 'User';
 
-    if (hour >= 5 && hour < 12) return `Good Morning 🌄, ${name} 👋`;
-    if (hour >= 12 && hour < 17) return `Good Afternoon 🌤️, ${name} 👋`;
-    if (hour >= 17 && hour < 22) return `Good Evening 🌙, ${name} 👋`;
-    return `Good Night 😴🌌, ${name} 👋`;
+    if (hour >= 5 && hour < 12) return `Good morning 🌅, ${name} 👋`;
+    if (hour >= 12 && hour < 17) return `Good afternoon ☀️, ${name} 👋`;
+    if (hour >= 17 && hour < 22) return `Good evening 🌆, ${name} 👋`;
+    return `Good night 🌙, ${name} 👋`;
   };
 
   const generateDailyPlan = async (): Promise<Task[]> => {

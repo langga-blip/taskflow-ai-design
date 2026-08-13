@@ -64,8 +64,11 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
         {/* Logo / Brand */}
         <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
           <div
-            onClick={() => setCurrentScreen('dashboard')}
-            className="flex items-center gap-2 cursor-pointer group min-w-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentScreen('dashboard');
+            }}
+            className="flex items-center gap-2 cursor-pointer group min-w-0 touch-manipulation select-none"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-[#7C3AED] to-[#06B6D4] p-0.5 shadow-[0_0_15px_rgba(124,58,237,0.5)] group-hover:scale-105 transition-transform flex-shrink-0">
               <div
@@ -119,9 +122,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
 
         {/* Action Controls - Horizontally Swipeable Icon Bar */}
         <div
-          className={`flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none py-1 px-1.5 touch-pan-x ml-auto shrink-0 flex-nowrap rounded-xl border sm:bg-transparent sm:border-none sm:p-0 shadow-inner w-[170px] xs:w-[205px] sm:w-auto max-w-[170px] xs:max-w-[205px] sm:max-w-none ${
+          className={`flex items-center gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none py-1 px-1.5 touch-pan-x overscroll-x-contain ml-auto shrink-0 flex-nowrap rounded-xl border sm:bg-transparent sm:border-none sm:p-0 shadow-inner w-[175px] xs:w-[210px] sm:w-auto max-w-[175px] xs:max-w-[210px] sm:max-w-none ${
             isLight
-              ? 'border-purple-200/80 bg-purple-100/70 text-purple-950'
+              ? 'border-slate-200 bg-slate-100/80 text-slate-900'
               : 'border-[#2E3552]/50 bg-[#131726]/80 text-slate-200'
           }`}
         >
@@ -132,15 +135,15 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
               e.stopPropagation();
               toggleTheme();
             }}
-            className={`p-2 rounded-xl border cursor-pointer flex-shrink-0 active:scale-95 touch-manipulation select-none transition-all duration-75 animate-glow-icon-amber ${
+            className={`p-2 rounded-xl border cursor-pointer flex-shrink-0 active:scale-95 touch-manipulation select-none transition-all duration-75 ${
               isLight
-                ? 'bg-white border-purple-300 text-purple-700 hover:bg-purple-50 shadow-sm'
-                : 'bg-[#1E2338] border-[#2E3552] text-amber-400 hover:text-white hover:border-[#7C3AED]/50'
+                ? 'bg-amber-50/80 border-amber-300 text-amber-600 hover:bg-amber-100/80 shadow-sm'
+                : 'bg-[#1E2338] border-amber-500/50 text-amber-400 hover:text-white hover:border-amber-400'
             }`}
             title={isLight ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
           >
             {isLight ? (
-              <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-purple-700" />
+              <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-amber-700" />
             ) : (
               <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
             )}
@@ -153,10 +156,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
               e.stopPropagation();
               setIsQuickNavOpen(true);
             }}
-            className={`p-2 rounded-xl border cursor-pointer flex-shrink-0 active:scale-95 touch-manipulation select-none transition-all duration-75 animate-glow-icon-cyan ${
+            className={`p-2 rounded-xl border cursor-pointer flex-shrink-0 active:scale-95 touch-manipulation select-none transition-all duration-75 ${
               isLight
-                ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
-                : 'bg-[#1E2338] border-[#2E3552] text-slate-300 hover:text-white hover:border-[#7C3AED]/50'
+                ? 'bg-cyan-50/80 border-cyan-300 text-cyan-600 hover:bg-cyan-100/80 shadow-sm'
+                : 'bg-[#1E2338] border-cyan-500/50 text-cyan-400 hover:text-white hover:border-cyan-400'
             }`}
             title="Quick Navigation"
           >
@@ -170,10 +173,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
               e.stopPropagation();
               setIsVoiceSheetOpen(true);
             }}
-            className={`p-2 rounded-xl border cursor-pointer flex-shrink-0 active:scale-95 touch-manipulation select-none transition-all duration-75 animate-glow-icon-teal ${
+            className={`p-2 rounded-xl border cursor-pointer flex-shrink-0 active:scale-95 touch-manipulation select-none transition-all duration-75 ${
               isLight
-                ? 'bg-white border-slate-300 text-[#06B6D4] hover:bg-cyan-50 shadow-sm'
-                : 'bg-[#1E2338] border-[#2E3552] text-[#06B6D4] hover:border-[#06B6D4]/50'
+                ? 'bg-emerald-50/80 border-emerald-300 text-emerald-600 hover:bg-emerald-100/80 shadow-sm'
+                : 'bg-[#1E2338] border-emerald-500/50 text-emerald-400 hover:text-white hover:border-emerald-400'
             }`}
             title="Voice Commands"
           >
@@ -187,20 +190,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
               e.stopPropagation();
               setIsNotificationSheetOpen(true);
             }}
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              setIsNotificationSheetOpen(true);
-            }}
-            className={`relative p-2 rounded-xl border cursor-pointer flex-shrink-0 active:scale-95 touch-manipulation select-none transition-all duration-75 animate-glow-icon-red ${
+            className={`relative p-2 rounded-xl border cursor-pointer flex-shrink-0 active:scale-95 touch-manipulation select-none transition-all duration-75 ${
               isLight
-                ? 'bg-white border-purple-300 text-purple-800 hover:bg-purple-50 shadow-sm'
-                : 'bg-[#1E2338] border-[#2E3552] text-slate-200 hover:text-white hover:border-[#7C3AED]/50'
+                ? 'bg-purple-50/80 border-purple-300 text-purple-700 hover:bg-purple-100/80 shadow-sm'
+                : 'bg-[#1E2338] border-purple-500/50 text-purple-300 hover:text-white hover:border-purple-400'
             }`}
             title="Notifications"
           >
             <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-red-500/85 backdrop-blur-md border border-red-300/70 shadow-[0_0_10px_rgba(239,68,68,0.6)] text-white font-extrabold text-[9px] sm:text-[10px] rounded-full flex items-center justify-center animate-pulse">
+              <span className="absolute -top-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-red-500/85 backdrop-blur-md border border-red-300/70 shadow-[0_0_10px_rgba(239,68,68,0.6)] text-white font-extrabold text-[9px] sm:text-[10px] rounded-full flex items-center justify-center animate-pulse transform-gpu will-change-transform pointer-events-none">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
@@ -213,7 +212,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
               e.stopPropagation();
               setCurrentScreen('profile');
             }}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] p-0.5 cursor-pointer active:scale-95 touch-manipulation select-none flex-shrink-0 transition-all duration-75 animate-glow-icon-indigo"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#2563EB] p-0.5 cursor-pointer active:scale-95 touch-manipulation select-none flex-shrink-0 transition-all duration-75"
             title="Profile & Settings"
           >
             <div

@@ -19,6 +19,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { suggestEmailReplyApi } from '../services/api';
+import { AppEmoji } from './AppEmoji';
 
 export const NotificationCenterSheet: React.FC = () => {
   const {
@@ -45,11 +46,9 @@ export const NotificationCenterSheet: React.FC = () => {
     Record<string, { replies: string[]; activeIdx: number; isGenerating: boolean }>
   >({});
 
-  if (!isNotificationSheetOpen) return null;
-
-  const categories: { id: string; label: string }[] = [
+  const categories: { id: string; label: string; emoji?: string }[] = [
     { id: 'ALL', label: 'All' },
-    { id: 'EMAIL', label: '📧 Email Alerts' },
+    { id: 'EMAIL', label: 'Email Alerts', emoji: '📧' },
     { id: 'SYSTEM', label: 'System' },
     { id: 'CLIENTS', label: 'Clients' },
     { id: 'PAYMENTS', label: 'Payments' },
@@ -70,7 +69,7 @@ export const NotificationCenterSheet: React.FC = () => {
       case 'PAYMENTS':
         return <CreditCard className="w-4 h-4 text-emerald-400" />;
       case 'AI':
-        return <Sparkles className="w-4 h-4 text-purple-400" />;
+        return <Sparkles className="w-4 h-4 text-amber-400" />;
       default:
         return <Bell className="w-4 h-4 text-cyan-400" />;
     }
@@ -162,22 +161,40 @@ export const NotificationCenterSheet: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setIsNotificationSheetOpen(false);
+        }
+      }}
+      className={`fixed inset-0 z-50 flex justify-end transition-all duration-150 ease-out ${
+        isNotificationSheetOpen
+          ? 'bg-black/60 opacity-100 pointer-events-auto'
+          : 'bg-black/0 opacity-0 pointer-events-none'
+      }`}
+    >
       <div
-        className={`w-full max-w-md h-full flex flex-col p-4 sm:p-5 shadow-2xl overflow-hidden border-l transition-colors ${
+        onClick={(e) => e.stopPropagation()}
+        className={`w-full max-w-md h-full flex flex-col p-4 sm:p-5 shadow-2xl overflow-hidden border-l transition-transform duration-150 cubic-bezier(0.16, 1, 0.3, 1) will-change-transform ${
+          isNotificationSheetOpen ? 'translate-x-0' : 'translate-x-full'
+        } ${
           isLight
-            ? 'bg-white border-purple-200 text-slate-900'
+            ? 'bg-white border-slate-200 text-slate-900'
             : 'bg-[#0A0C14] border-[#2E3552] text-white'
         }`}
       >
         {/* Header */}
         <div
           className={`flex items-center justify-between pb-3 sm:pb-4 border-b ${
-            isLight ? 'border-purple-200' : 'border-[#2E3552]'
+            isLight ? 'border-slate-200' : 'border-[#2E3552]'
           }`}
         >
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-[#7C3AED]/20 rounded-xl border border-[#7C3AED]/50 text-[#A78BFA] shadow-[0_0_12px_rgba(124,58,237,0.4)]">
+            <div className={`p-2 rounded-xl border ${
+              isLight
+                ? 'bg-slate-100 border-slate-300 text-slate-700'
+                : 'bg-[#7C3AED]/20 border-[#7C3AED]/50 text-[#A78BFA] shadow-[0_0_12px_rgba(124,58,237,0.4)]'
+            }`}>
               <Bell className="w-5 h-5" />
             </div>
             <div>
@@ -210,13 +227,18 @@ export const NotificationCenterSheet: React.FC = () => {
                 onClick={() => setSelectedFilter(cat.id)}
                 className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all cursor-pointer whitespace-nowrap border ${
                   selectedFilter === cat.id
-                    ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-[0_0_12px_rgba(124,58,237,0.5)]'
+                    ? isLight
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                      : 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-[0_0_12px_rgba(124,58,237,0.5)]'
                     : isLight
-                    ? 'bg-purple-50 text-purple-900 border-purple-200 hover:bg-purple-100'
+                    ? 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
                     : 'bg-[#131726] text-slate-400 hover:text-slate-200 border-[#2E3552]'
                 }`}
               >
-                {cat.label}
+                <span className="flex items-center gap-1.5">
+                  {cat.emoji && <AppEmoji symbolOrName={cat.emoji} size="sm" />}
+                  <span>{cat.label}</span>
+                </span>
               </button>
             ))}
           </div>
@@ -242,17 +264,21 @@ export const NotificationCenterSheet: React.FC = () => {
                   className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden ${
                     n.isRead
                       ? isLight
-                        ? 'bg-slate-50 border-purple-100 text-slate-600'
+                        ? 'bg-slate-50 border-slate-200 text-slate-600'
                         : 'bg-[#131726]/60 border-[#2E3552]/60 text-slate-400'
                       : isLight
-                      ? 'bg-purple-50/90 border-purple-300 text-slate-900 shadow-sm ring-1 ring-purple-300/60'
-                      : 'bg-[#131726] border-[#7C3AED]/70 text-white shadow-[0_0_18px_rgba(124,58,237,0.25)] ring-1 ring-[#7C3AED]/50'
+                      ? 'bg-slate-50/90 border-slate-300 text-slate-900 shadow-sm ring-1 ring-slate-200'
+                      : 'bg-[#131726] border-[#2E3552] text-white shadow-md'
                   }`}
                 >
                   {/* Top Bar */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg border border-purple-500/40 bg-purple-500/10 text-purple-400">
+                      <div className={`p-1.5 rounded-lg border ${
+                        isLight
+                          ? 'border-slate-300 bg-slate-100 text-slate-700'
+                          : 'border-cyan-500/40 bg-cyan-500/10 text-cyan-400'
+                      }`}>
                         {getCategoryIcon(n.category)}
                       </div>
                       <div>
@@ -260,7 +286,7 @@ export const NotificationCenterSheet: React.FC = () => {
                           {n.title}
                         </span>
                         {n.senderEmail && (
-                          <span className="text-[10px] font-mono text-cyan-400 block">
+                          <span className={`text-[10px] font-mono block ${isLight ? 'text-cyan-700' : 'text-cyan-400'}`}>
                             From: {n.senderName || 'Sender'} &lt;{n.senderEmail}&gt;
                           </span>
                         )}
@@ -281,8 +307,8 @@ export const NotificationCenterSheet: React.FC = () => {
                       onClick={(e) => e.stopPropagation()}
                       className={`mt-3 p-3 rounded-xl border relative space-y-2 ${
                         isLight
-                          ? 'bg-white border-purple-300 shadow-sm'
-                          : 'bg-[#0A0C14] border-purple-500/60 shadow-[0_0_15px_rgba(124,58,237,0.2)]'
+                          ? 'bg-white border-slate-200 shadow-sm'
+                          : 'bg-[#0A0C14] border-[#2E3552] shadow-sm'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -316,7 +342,7 @@ export const NotificationCenterSheet: React.FC = () => {
                       <p
                         className={`text-xs p-2.5 rounded-lg border font-mono leading-relaxed select-text ${
                           isLight
-                            ? 'bg-purple-50/60 border-purple-200 text-slate-800'
+                            ? 'bg-slate-50 border-slate-200 text-slate-800'
                             : 'bg-[#131726] border-[#2E3552] text-slate-200'
                         }`}
                       >
@@ -388,7 +414,7 @@ export const NotificationCenterSheet: React.FC = () => {
                   {/* Card Bottom Bar */}
                   <div
                     className={`flex items-center justify-between mt-3 pt-2 border-t text-[11px] ${
-                      isLight ? 'border-purple-100' : 'border-[#2E3552]/40'
+                      isLight ? 'border-slate-200' : 'border-[#2E3552]/40'
                     }`}
                   >
                     {n.actionRoute && (

@@ -84,7 +84,14 @@ export const QuickNavPopupMenu: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setIsQuickNavOpen(false);
+        }
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+    >
       <div
         className={`w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4 border transition-colors ${
           isLight

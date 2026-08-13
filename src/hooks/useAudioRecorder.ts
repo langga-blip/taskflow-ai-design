@@ -37,39 +37,17 @@ export const useAudioRecorder = (options?: UseAudioRecorderOptions): UseAudioRec
 
   // Smooth timer that doesn't freeze during scrolling
   useEffect(() => {
-    let startTime = Date.now();
-    let animId: number;
-
-    const tick = () => {
-      if (isListening) {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        if (elapsed !== lastSecondRef.current) {
-          lastSecondRef.current = elapsed;
-          setRecordSeconds(elapsed);
-        }
-        animId = requestAnimationFrame(tick);
-      }
-    };
-
     if (isListening) {
-      startTime = Date.now();
+      const startTime = Date.now();
       lastSecondRef.current = 0;
       setRecordSeconds(0);
-      animId = requestAnimationFrame(tick);
 
-      const handleScrollOrTouch = () => {
+      const interval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
         setRecordSeconds(elapsed);
-      };
+      }, 500);
 
-      window.addEventListener('scroll', handleScrollOrTouch, { passive: true });
-      window.addEventListener('touchmove', handleScrollOrTouch, { passive: true });
-
-      return () => {
-        cancelAnimationFrame(animId);
-        window.removeEventListener('scroll', handleScrollOrTouch);
-        window.removeEventListener('touchmove', handleScrollOrTouch);
-      };
+      return () => clearInterval(interval);
     } else {
       setRecordSeconds(0);
     }

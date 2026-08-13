@@ -7,8 +7,9 @@ import { CurvyDivider } from '../components/CurvyDivider';
 import {
   formatCountryDate,
   formatCountryTime,
-  getCountryTimeOfDayGreeting,
+  getCountryGreetingParts,
 } from '../utils/dateUtils';
+import { AppEmoji } from '../components/AppEmoji';
 import {
   TrendingUp,
   Sparkles,
@@ -43,32 +44,11 @@ export const DashboardScreen: React.FC = () => {
   const [now, setNow] = useState(new Date());
 
   React.useEffect(() => {
-    let animId: number;
-    let lastTime = Date.now();
-
-    const updateClock = () => {
-      const current = Date.now();
-      if (current - lastTime >= 1000) {
-        lastTime = current;
-        setNow(new Date());
-      }
-      animId = requestAnimationFrame(updateClock);
-    };
-
-    animId = requestAnimationFrame(updateClock);
-
-    const handleScrollOrTouch = () => {
+    const timer = setInterval(() => {
       setNow(new Date());
-    };
+    }, 1000);
 
-    window.addEventListener('scroll', handleScrollOrTouch, { passive: true });
-    window.addEventListener('touchmove', handleScrollOrTouch, { passive: true });
-
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener('scroll', handleScrollOrTouch);
-      window.removeEventListener('touchmove', handleScrollOrTouch);
-    };
+    return () => clearInterval(timer);
   }, []);
 
   const countryCode = userProfile.country || userProfile.language;
@@ -76,7 +56,7 @@ export const DashboardScreen: React.FC = () => {
 
   const formattedDate = formatCountryDate(now, countryCode, timezoneId);
   const formattedTime = formatCountryTime(now, countryCode, timezoneId);
-  const countryGreeting = getCountryTimeOfDayGreeting(
+  const greetingParts = getCountryGreetingParts(
     userProfile.userName || userProfile.businessName || 'Founder',
     countryCode,
     timezoneId,
@@ -187,21 +167,43 @@ export const DashboardScreen: React.FC = () => {
 
       {/* Greeting Banner */}
       <div
-        className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-5 rounded-2xl shadow-xl border animate-glow-border ${
+        className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl shadow-xl border animate-glow-border ${
           isLight
             ? 'bg-gradient-to-r from-purple-50 via-white to-purple-50 border-purple-200 text-slate-900'
             : 'bg-gradient-to-r from-[#131726] via-[#1E2338] to-[#131726] border-[#2E3552] text-white'
         }`}
       >
-        <div>
-          <h1 className={`text-xl sm:text-2xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>
-            {countryGreeting}
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <h1
+            className={`text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight flex flex-wrap items-center gap-x-2 gap-y-1 ${
+              isLight ? 'text-slate-900' : 'text-white'
+            }`}
+          >
+            <span>{greetingParts.greetingText}</span>
+            <AppEmoji symbolOrName={greetingParts.emoji} size="md" className="shrink-0" />
+            <span className="truncate">, {greetingParts.userName}</span>
+            <AppEmoji symbolOrName="👋" size="md" className="shrink-0" />
           </h1>
-          <p className={`text-xs mt-1 ${isLight ? 'text-slate-600 font-medium' : 'text-slate-400'}`}>
-            {userProfile.businessName} • {userProfile.industry}
-          </p>
+          <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+            <span className={`font-semibold ${isLight ? 'text-purple-900' : 'text-cyan-400'}`}>
+              {userProfile.businessName}
+            </span>
+            <span className={isLight ? 'text-slate-400' : 'text-slate-600'}>•</span>
+            <span className={isLight ? 'text-slate-600' : 'text-slate-300'}>
+              {userProfile.industry}
+            </span>
+            {userProfile.country && (
+              <>
+                <span className={isLight ? 'text-slate-400' : 'text-slate-600'}>•</span>
+                <span className="px-2 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[11px] font-mono">
+                  {userProfile.country}
+                </span>
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-2.5 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-purple-500/20">
           <NeonButton onClick={() => setCurrentScreen('planner')} size="sm">
             <Sparkles className="w-4 h-4" /> AI Planner
           </NeonButton>

@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { NeonButton } from '../components/NeonButton';
-import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Mic, MicOff, Wand2, Volume2 } from 'lucide-react';
-import { createVoiceRecognizer, speakWithAlexaVoice, VoiceRecognizerController } from '../utils/speechUtils';
+import { FormattedTextWithAppEmojis, AppEmoji } from '../components/AppEmoji';
+import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Wand2, Volume2, Image as ImageIcon, X } from 'lucide-react';
+import { speakWithAlexaVoice } from '../utils/speechUtils';
 import { autoCorrectText } from '../utils/autoCorrect';
 
 interface ChatMessage {
@@ -11,6 +12,7 @@ interface ChatMessage {
   sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
+  imageUrl?: string;
 }
 
 interface IncomingEmail {
@@ -65,7 +67,34 @@ export const AiAssistantScreen: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Listen for execute-ai-prompt event (e.g. from Voice Command Sheet Run button)
+  useEffect(() => {
+    const handleExecutePromptEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ prompt: string }>;
+      if (customEvent.detail && customEvent.detail.prompt) {
+        handleSendMessage(customEvent.detail.prompt);
+      }
+    };
+
+    window.addEventListener('execute-ai-prompt', handleExecutePromptEvent);
+    return () => window.removeEventListener('execute-ai-prompt', handleExecutePromptEvent);
+  }, []);
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSelectedImage(reader.result as string);
+        triggerNotification('Image Attached 🖼️', 'Image uploaded successfully. Ask AI to analyze it!', 'SYSTEM');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Gmail smart response state
   const [incomingEmail, setIncomingEmail] = useState<IncomingEmail | null>({
@@ -168,23 +197,30 @@ export const AiAssistantScreen: React.FC = () => {
 
   const handleSendMessage = async (customText?: string) => {
     const rawText = (customText || inputText).trim();
-    if (!rawText || isTyping) return;
+    if ((!rawText && !selectedImage) || isTyping) return;
 
-    const textToSend = autoCorrectText(rawText);
+    const textToSend = autoCorrectText(rawText || (selectedImage ? 'Attached Image Analysis Request' : ''));
+    const attachedImg = selectedImage;
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
       text: textToSend,
+      imageUrl: attachedImg || undefined,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setInputText('');
+    setSelectedImage(null);
     setIsTyping(true);
 
     try {
-      const aiReply = await askAssistant(textToSend);
+      const promptWithImgContext = attachedImg
+        ? `[User attached an image file]. Prompt: ${textToSend}`
+        : textToSend;
+
+      const aiReply = await askAssistant(promptWithImgContext);
 
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -276,11 +312,11 @@ export const AiAssistantScreen: React.FC = () => {
             key={i}
             className={`font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}
           >
-            {part.slice(2, -2)}
+            <FormattedTextWithAppEmojis text={part.slice(2, -2)} />
           </strong>
         );
       }
-      return part;
+      return <FormattedTextWithAppEmojis key={i} text={part} />;
     });
   };
 
@@ -288,7 +324,7 @@ export const AiAssistantScreen: React.FC = () => {
     <div className="space-y-4 pb-6 max-w-4xl mx-auto flex flex-col animate-fade-in overflow-x-hidden w-full">
       {/* Header Banner */}
       <GlassCard
-        className={`p-4 flex-shrink-0 border animate-glow-cyan ${
+        className={`p-4 flex-shrink-0 border ${
           isLight
             ? 'bg-gradient-to-r from-purple-50 via-white to-purple-50 border-cyan-300'
             : 'bg-gradient-to-r from-[#131726] via-[#1E2338] to-[#131726] border-[#06B6D4]/40'
@@ -576,7 +612,14 @@ export const AiAssistantScreen: React.FC = () => {
                 {m.sender === 'assistant' ? (
                   renderFormattedText(m.text)
                 ) : (
-                  <p className="whitespace-pre-line leading-relaxed">{m.text}</p>
+                  <div className="space-y-2">
+                    {m.imageUrl && (
+                      <div className="rounded-xl overflow-hidden max-w-xs border border-purple-300/30">
+                        <img src={m.imageUrl} alt="Attached input" className="w-full h-auto object-cover max-h-48" />
+                      </div>
+                    )}
+                    <p className="whitespace-pre-line leading-relaxed">{m.text}</p>
+                  </div>
                 )}
 
                 <div className="flex items-center justify-between pt-2 border-t border-purple-100/20 text-[10px] text-slate-400">
@@ -658,8 +701,30 @@ export const AiAssistantScreen: React.FC = () => {
         ))}
       </div>
 
-      {/* Message Input Box with Auto-Correct */}
+      {/* Message Input Box with Image Upload & Auto-Correct */}
       <div className="flex flex-col gap-1.5 flex-shrink-0 w-full min-w-0">
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageSelect}
+        />
+
+        {selectedImage && (
+          <div className="flex items-center gap-2 p-2 bg-[#131726]/90 border border-purple-500/40 rounded-xl w-fit">
+            <img src={selectedImage} alt="Attachment Preview" className="w-10 h-10 object-cover rounded-lg" />
+            <span className="text-xs text-purple-300 font-semibold">Image attached</span>
+            <button
+              type="button"
+              onClick={() => setSelectedImage(null)}
+              className="p-1 text-slate-400 hover:text-red-400 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {inputText.trim().length > 0 && (
           <div className="flex items-center justify-between px-1 text-[11px]">
             <span className="text-slate-400">Typing...</span>
@@ -675,21 +740,6 @@ export const AiAssistantScreen: React.FC = () => {
         )}
 
         <div className="flex items-center gap-2 w-full min-w-0">
-          <button
-            type="button"
-            onClick={toggleVoiceInput}
-            title={isListeningVoice ? 'Listening... Tap to stop' : 'Tap to speak command'}
-            className={`p-3 rounded-2xl border transition-all cursor-pointer shrink-0 ${
-              isListeningVoice
-                ? 'bg-red-500 text-white border-red-400 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.6)]'
-                : isLight
-                ? 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700'
-                : 'bg-[#131726] hover:bg-[#1E2338] border-[#2E3552] text-[#06B6D4] hover:border-[#06B6D4]'
-            }`}
-          >
-            {isListeningVoice ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-          </button>
-
           <div className="relative flex-1 min-w-0">
             <input
               type="text"
@@ -699,11 +749,9 @@ export const AiAssistantScreen: React.FC = () => {
               autoCorrect="on"
               autoCapitalize="sentences"
               spellCheck={true}
-              placeholder={isListeningVoice ? 'Listening... Speak now' : 'Ask AI anything about your business, proposals, or tasks...'}
+              placeholder="Ask AI anything about your business, proposals, or tasks..."
               className={`w-full border rounded-2xl pl-4 pr-10 py-3 text-sm focus:outline-none ${
-                isListeningVoice
-                  ? 'border-red-500 bg-red-500/10 text-white placeholder-red-300'
-                  : isLight
+                isLight
                   ? 'bg-white border-purple-300 text-slate-900 placeholder-slate-400 focus:border-purple-600 shadow-sm'
                   : 'bg-[#131726] border-[#2E3552] text-white placeholder-slate-500 focus:border-[#06B6D4]'
               }`}
@@ -720,6 +768,23 @@ export const AiAssistantScreen: React.FC = () => {
             )}
           </div>
 
+          {/* Image Upload Icon placed right before Send Icon */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            title="Attach Image"
+            className={`p-3 rounded-2xl border transition-all cursor-pointer shrink-0 ${
+              selectedImage
+                ? 'bg-purple-600 text-white border-purple-400'
+                : isLight
+                ? 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700'
+                : 'bg-[#131726] hover:bg-[#1E2338] border-[#2E3552] text-[#06B6D4] hover:border-[#06B6D4]'
+            }`}
+          >
+            <ImageIcon className="w-5 h-5" />
+          </button>
+
+          {/* Send Icon */}
           <button
             type="button"
             onClick={() => handleSendMessage()}
