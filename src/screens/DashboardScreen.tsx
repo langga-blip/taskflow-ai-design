@@ -38,8 +38,32 @@ export const DashboardScreen: React.FC = () => {
   const [now, setNow] = useState(new Date());
 
   React.useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
+    let animId: number;
+    let lastTime = Date.now();
+
+    const updateClock = () => {
+      const current = Date.now();
+      if (current - lastTime >= 1000) {
+        lastTime = current;
+        setNow(new Date());
+      }
+      animId = requestAnimationFrame(updateClock);
+    };
+
+    animId = requestAnimationFrame(updateClock);
+
+    const handleScrollOrTouch = () => {
+      setNow(new Date());
+    };
+
+    window.addEventListener('scroll', handleScrollOrTouch, { passive: true });
+    window.addEventListener('touchmove', handleScrollOrTouch, { passive: true });
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('scroll', handleScrollOrTouch);
+      window.removeEventListener('touchmove', handleScrollOrTouch);
+    };
   }, []);
 
   const formattedDate = now.toLocaleDateString('en-US', {

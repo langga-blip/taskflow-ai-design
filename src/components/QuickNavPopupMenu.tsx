@@ -112,7 +112,7 @@ export const QuickNavPopupMenu: React.FC = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[60vh] overflow-y-auto pr-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[60vh] overflow-y-auto scrollbar-none pr-1">
           {routes.map((r) => (
             <button
               key={r.id}

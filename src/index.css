@@ -27,26 +27,26 @@ body,
   overflow-x: hidden !important;
 }
 
-/* High-performance Hardware Accelerated Vertical Scrollbar */
+/* High-performance Hardware Accelerated Vertical Scrollbar for the main screens */
 html {
   scrollbar-width: thin;
   scrollbar-color: #7C3AED rgba(15, 23, 42, 0.2);
 }
 
-::-webkit-scrollbar {
+html::-webkit-scrollbar {
   width: 7px;
   height: 7px;
 }
-::-webkit-scrollbar-track {
+html::-webkit-scrollbar-track {
   background: rgba(15, 23, 42, 0.3);
   border-radius: 4px;
 }
-::-webkit-scrollbar-thumb {
+html::-webkit-scrollbar-thumb {
   background: #7C3AED;
   border-radius: 9999px;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
-::-webkit-scrollbar-thumb:hover {
+html::-webkit-scrollbar-thumb:hover {
   background: #9333EA;
 }
 

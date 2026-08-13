@@ -118,7 +118,7 @@ export const NotificationCenterSheet: React.FC = () => {
         </div>
 
         {/* Notifications List */}
-        <div className="flex-1 overflow-y-auto space-y-3 pr-1 my-2">
+        <div className="flex-1 overflow-y-auto scrollbar-none space-y-3 pr-1 my-2">
           {filteredNotifications.length === 0 ? (
             <div className={`text-center py-12 ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
               <Bell className="w-10 h-10 mx-auto mb-2 opacity-30" />

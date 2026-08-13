@@ -1,38 +1,42 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Mic, Sparkles, Send, Check, Bookmark, Disc, Square, Volume2 } from 'lucide-react';
-import { NeonButton } from './NeonButton';
-import { createVoiceRecognizer, speakWithAlexaVoice, VoiceRecognizerController } from '../utils/speechUtils';
+import { X, Mic, Sparkles, Send, Bookmark, Disc, Square, Volume2 } from 'lucide-react';
+import { useAudioRecorder } from '../hooks/useAudioRecorder';
 
 export const VoiceCommandSheet: React.FC = () => {
   const { isVoiceSheetOpen, setIsVoiceSheetOpen, saveTask, setCurrentScreen, triggerNotification, userProfile } = useApp();
   const isLight = userProfile?.themeMode === 'Light';
   const [commandText, setCommandText] = useState('');
-  const [isListening, setIsListening] = useState(false);
-  const [recordSeconds, setRecordSeconds] = useState(0);
 
-  const recognizerControllerRef = useRef<VoiceRecognizerController | null>(null);
+  const {
+    isListening,
+    recordSeconds,
+    transcript,
+    toggleRecording,
+    stopRecording,
+    speak,
+  } = useAudioRecorder({
+    onTranscriptChange: (text) => {
+      setCommandText(text);
+    },
+    onError: (errMsg) => {
+      triggerNotification('Microphone Notice', errMsg, 'SYSTEM');
+    },
+  });
 
+  // Keep commandText in sync with transcript changes during active recording
   useEffect(() => {
-    let interval: any = null;
-    if (isListening) {
-      setRecordSeconds(0);
-      interval = setInterval(() => {
-        setRecordSeconds((prev) => prev + 1);
-      }, 1000);
-    } else {
-      clearInterval(interval);
+    if (transcript) {
+      setCommandText(transcript);
     }
-    return () => clearInterval(interval);
-  }, [isListening]);
+  }, [transcript]);
 
+  // Clean stop recording if closed
   useEffect(() => {
-    return () => {
-      if (recognizerControllerRef.current) {
-        recognizerControllerRef.current.stop();
-      }
-    };
-  }, []);
+    if (!isVoiceSheetOpen && isListening) {
+      stopRecording();
+    }
+  }, [isVoiceSheetOpen, isListening, stopRecording]);
 
   if (!isVoiceSheetOpen) return null;
 
@@ -48,7 +52,12 @@ export const VoiceCommandSheet: React.FC = () => {
     const query = (textToRun || commandText).trim();
     if (!query) return;
 
-    speakWithAlexaVoice(`Processing command: ${query}`);
+    if (isListening) {
+      stopRecording();
+    }
+
+    // Alexa voice synthesis response
+    speak(`Processing command: ${query}`);
 
     const lower = query.toLowerCase();
 
@@ -79,7 +88,13 @@ export const VoiceCommandSheet: React.FC = () => {
 
   const handleSaveVoiceNote = () => {
     const textToSave = commandText.trim() || 'Recorded Voice Note Task';
-    speakWithAlexaVoice(`Saved voice note: ${textToSave}`);
+
+    if (isListening) {
+      stopRecording();
+    }
+
+    speak(`Saved voice note: ${textToSave}`);
+
     saveTask({
       title: `🎙️ Voice Note: ${textToSave}`,
       category: 'GENERAL',
@@ -87,49 +102,24 @@ export const VoiceCommandSheet: React.FC = () => {
       revenueImpact: 'MEDIUM',
       dueDate: 'Today',
     });
+
     triggerNotification('Voice Note Saved', `Saved voice note as task: "${textToSave}"`, 'SYSTEM', 'tasks');
     setCommandText('');
     setIsVoiceSheetOpen(false);
   };
 
-  const toggleListen = async () => {
-    if (isListening) {
-      if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-        try {
-          navigator.vibrate([30, 40, 30]);
-        } catch (e) {}
-      }
-      if (recognizerControllerRef.current) {
-        recognizerControllerRef.current.stop();
-      }
-      setIsListening(false);
-      return;
-    }
-
+  const handleToggleListen = async () => {
     if (typeof window !== 'undefined' && 'vibrate' in navigator) {
       try {
-        navigator.vibrate(60);
+        navigator.vibrate(isListening ? [30, 40, 30] : 60);
       } catch (e) {}
     }
 
-    setIsListening(true);
-    triggerNotification('Listening for Voice 🎙️', 'Speak your words into the microphone now...', 'SYSTEM');
+    if (!isListening) {
+      triggerNotification('Listening for Voice 🎙️', 'Speak your words into the microphone now...', 'SYSTEM');
+    }
 
-    const controller = createVoiceRecognizer(
-      (transcribedText) => {
-        setCommandText(transcribedText);
-      },
-      (errorMsg) => {
-        triggerNotification('Microphone Notice', errorMsg, 'SYSTEM');
-        setIsListening(false);
-      },
-      () => {
-        setIsListening(false);
-      }
-    );
-
-    recognizerControllerRef.current = controller;
-    await controller.start();
+    await toggleRecording();
   };
 
   const formatTime = (secs: number) => {
@@ -141,7 +131,7 @@ export const VoiceCommandSheet: React.FC = () => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in">
       <div
-        className={`w-full max-w-lg max-h-[85vh] rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4 overflow-y-auto my-auto border transition-colors ${
+        className={`w-full max-w-lg max-h-[85vh] rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4 overflow-y-auto scrollbar-none my-auto border transition-colors ${
           isLight
             ? 'bg-white border-purple-300 text-slate-900'
             : 'bg-[#0A0C14] border-[#2E3552] text-white'
@@ -164,7 +154,10 @@ export const VoiceCommandSheet: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={() => setIsVoiceSheetOpen(false)}
+            onClick={() => {
+              if (isListening) stopRecording();
+              setIsVoiceSheetOpen(false);
+            }}
             className={`p-1.5 sm:p-2 rounded-xl border cursor-pointer ${
               isLight
                 ? 'bg-slate-100 border-slate-300 text-slate-600 hover:text-slate-900'
@@ -183,7 +176,7 @@ export const VoiceCommandSheet: React.FC = () => {
         >
           <button
             type="button"
-            onClick={toggleListen}
+            onClick={handleToggleListen}
             className={`w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-full flex items-center justify-center transition-all cursor-pointer relative ${
               isListening
                 ? 'bg-red-600 text-white shadow-[0_0_35px_rgba(239,68,68,0.9)] animate-pulse'
@@ -240,7 +233,7 @@ export const VoiceCommandSheet: React.FC = () => {
             spellCheck={true}
             rows={2}
             placeholder="e.g. Add task: Pitch $5k retainer proposal to client today..."
-            className={`w-full rounded-xl p-3 text-sm focus:outline-none focus:border-[#06B6D4] resize-none border ${
+            className={`w-full rounded-xl p-3 text-sm focus:outline-none focus:border-[#06B6D4] resize-none border scrollbar-none ${
               isLight
                 ? 'bg-slate-50 border-purple-200 text-slate-900 placeholder-slate-400'
                 : 'bg-[#131726] border-[#2E3552] text-white placeholder-slate-500'
@@ -275,10 +268,11 @@ export const VoiceCommandSheet: React.FC = () => {
         {/* Quick Sample Prompts */}
         <div className="space-y-2">
           <p className={`text-xs font-semibold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Quick Prompt Shortcuts:</p>
-          <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+          <div className="space-y-1.5 max-h-40 overflow-y-auto scrollbar-none pr-1">
             {quickPrompts.map((p, idx) => (
               <button
                 key={idx}
+                type="button"
                 onClick={() => handleExecuteCommand(p)}
                 className={`w-full text-left text-xs p-2.5 rounded-xl transition-colors cursor-pointer flex items-center justify-between border ${
                   isLight

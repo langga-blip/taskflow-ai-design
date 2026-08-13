@@ -392,7 +392,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
 
               {/* Status / Response Box */}
               <div
-                className={`p-3 rounded-xl border text-xs max-h-40 overflow-y-auto space-y-1.5 ${
+                className={`p-3 rounded-xl border text-xs max-h-40 overflow-y-auto scrollbar-none space-y-1.5 ${
                   isLight
                     ? 'bg-purple-50/70 border-purple-200 text-slate-800'
                     : 'bg-[#131726] border-[#2E3552] text-slate-200'
