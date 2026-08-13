@@ -5,6 +5,11 @@ import { NeonButton } from '../components/NeonButton';
 import { StatChip } from '../components/StatChip';
 import { CurvyDivider } from '../components/CurvyDivider';
 import {
+  formatCountryDate,
+  formatCountryTime,
+  getCountryTimeOfDayGreeting,
+} from '../utils/dateUtils';
+import {
   TrendingUp,
   Sparkles,
   CheckCircle2,
@@ -66,18 +71,17 @@ export const DashboardScreen: React.FC = () => {
     };
   }, []);
 
-  const formattedDate = now.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const countryCode = userProfile.country || userProfile.language;
+  const timezoneId = userProfile.timezoneId;
 
-  const formattedTime = now.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
+  const formattedDate = formatCountryDate(now, countryCode, timezoneId);
+  const formattedTime = formatCountryTime(now, countryCode, timezoneId);
+  const countryGreeting = getCountryTimeOfDayGreeting(
+    userProfile.userName || userProfile.businessName || 'Founder',
+    countryCode,
+    timezoneId,
+    now
+  );
 
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [isEditRevModalOpen, setIsEditRevModalOpen] = useState(false);
@@ -191,7 +195,7 @@ export const DashboardScreen: React.FC = () => {
       >
         <div>
           <h1 className={`text-xl sm:text-2xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>
-            {getTimeOfDayGreeting()}
+            {countryGreeting}
           </h1>
           <p className={`text-xs mt-1 ${isLight ? 'text-slate-600 font-medium' : 'text-slate-400'}`}>
             {userProfile.businessName} • {userProfile.industry}

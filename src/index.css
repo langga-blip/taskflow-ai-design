@@ -33,6 +33,18 @@ html {
   scrollbar-color: #7C3AED rgba(15, 23, 42, 0.2);
 }
 
+/* Force GPU acceleration so pulse animations & time counters never freeze on scroll */
+.animate-pulse,
+.animate-spin,
+.animate-bounce,
+.pulse-purple-glow {
+  will-change: transform, opacity, box-shadow;
+  transform: translate3d(0, 0, 0) !important;
+  -webkit-transform: translate3d(0, 0, 0) !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
+}
+
 html::-webkit-scrollbar {
   width: 7px;
   height: 7px;

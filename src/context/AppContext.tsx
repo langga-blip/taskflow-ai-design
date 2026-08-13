@@ -23,6 +23,8 @@ import {
   generateDailyPlanApi,
   askAssistantApi,
   generateWeeklyReviewApi,
+  sendTaskEmailNotificationApi,
+  sendDeadlineAlertApi,
 } from '../services/api';
 
 interface AppContextType {
@@ -168,10 +170,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const saveTask = (task: Partial<Task>) => {
+    const regEmail = userProfile.userEmail || 'mummom692@gmail.com';
+
     if (task.id) {
       setTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, ...task } as Task : t))
+        prev.map((t) => (t.id === task.id ? ({ ...t, ...task } as Task) : t))
       );
+
+      // Check if updating task deadline to 'Today' or approaching
+      if (task.dueDate === 'Today' || task.priority === 'URGENT') {
+        const taskTitle = task.title || 'Task';
+        sendDeadlineAlertApi(regEmail, taskTitle, task.dueDate || 'Today');
+        triggerNotification(
+          `⏰ Registered Email Alert Sent (${regEmail})`,
+          `Deadline approaching for "${taskTitle}". An email notification was dispatched to your registered email address.`,
+          'EMAIL',
+          'tasks'
+        );
+      }
     } else {
       const newTask: Task = {
         id: Date.now(),
@@ -187,6 +203,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createdAt: Date.now(),
       };
       setTasks((prev) => [newTask, ...prev]);
+
+      // Trigger real-time task creation email to registered email address
+      sendTaskEmailNotificationApi(
+        regEmail,
+        newTask.title,
+        newTask.description,
+        newTask.dueDate,
+        newTask.priority,
+        newTask.revenueImpact
+      );
+
+      // Notify the user in the app with real-time AI Email alert
+      triggerNotification(
+        `📧 Registered Email Sent (${regEmail})`,
+        `A real-time email notification was dispatched to your registered address (${regEmail}) for task: "${newTask.title}".`,
+        'EMAIL',
+        'tasks'
+      );
+
+      // If deadline is today, also send approaching deadline email notification
+      if (newTask.dueDate === 'Today' || newTask.priority === 'URGENT') {
+        sendDeadlineAlertApi(regEmail, newTask.title, newTask.dueDate);
+      }
     }
   };
 

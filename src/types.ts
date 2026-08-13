@@ -73,7 +73,7 @@ export interface WeeklyReview {
   createdAt: number;
 }
 
-export type NotificationCategory = 'SYSTEM' | 'CLIENTS' | 'PAYMENTS' | 'AI';
+export type NotificationCategory = 'SYSTEM' | 'CLIENTS' | 'PAYMENTS' | 'AI' | 'EMAIL';
 
 export interface AppNotification {
   id: string;
@@ -83,6 +83,10 @@ export interface AppNotification {
   category: NotificationCategory;
   isRead: boolean;
   actionRoute?: string;
+  emailSubject?: string;
+  recipientEmail?: string;
+  senderName?: string;
+  senderEmail?: string;
 }
 
 export type AiProvider = 'GEMINI' | 'OPENAI' | 'DEEPSEEK';

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Bot, Sparkles, Mic, MicOff, Volume2, X, Maximize2, Layers, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Bot, Sparkles, Mic, MicOff, Volume2, X, Maximize2, Layers, ExternalLink, ShieldCheck, Mail } from 'lucide-react';
 import { askAssistantApi } from '../services/api';
 import { createVoiceRecognizer, speakWithAlexaVoice, VoiceRecognizerController } from '../utils/speechUtils';
 import { autoCorrectText } from '../utils/autoCorrect';
 
 export const FloatingAssistantOverlay: React.FC = () => {
-  const { currentScreen, setCurrentScreen, userProfile } = useApp();
+  const { currentScreen, setCurrentScreen, userProfile, notifications } = useApp();
 
   const isLight = userProfile?.themeMode === 'Light';
 
@@ -17,6 +17,9 @@ export const FloatingAssistantOverlay: React.FC = () => {
   const [isThinking, setIsThinking] = useState(false);
   const [isOverlayModeActive, setIsOverlayModeActive] = useState(false);
   const [pipWindowRef, setPipWindowRef] = useState<Window | null>(null);
+
+  // Latest email notification sent to registered email
+  const latestEmailNotif = notifications.find((n) => n.category === 'EMAIL');
 
   const controllerRef = useRef<VoiceRecognizerController | null>(null);
   const currentTranscriptRef = useRef<string>('');
@@ -389,6 +392,25 @@ export const FloatingAssistantOverlay: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Registered Email Alert Banner */}
+              {latestEmailNotif && (
+                <div
+                  className={`p-2.5 rounded-xl border text-xs space-y-1 ${
+                    isLight
+                      ? 'bg-cyan-50 border-cyan-300 text-slate-800'
+                      : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between font-bold text-[11px]">
+                    <span className="flex items-center gap-1 text-[#06B6D4]">
+                      <Mail className="w-3.5 h-3.5" /> {latestEmailNotif.title}
+                    </span>
+                    <span className="text-[9px] font-mono text-cyan-400">{latestEmailNotif.timestamp}</span>
+                  </div>
+                  <p className="text-[11px] leading-snug opacity-90">{latestEmailNotif.message}</p>
+                </div>
+              )}
 
               {/* Status / Response Box */}
               <div
