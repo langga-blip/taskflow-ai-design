@@ -33,16 +33,26 @@ const MainAppContent: React.FC = () => {
     }
   }, [isLight]);
 
-  const isFullscreenView = ['splash', 'landing', 'auth', 'onboarding'].includes(currentScreen);
-  const isPublicScreen = ['splash', 'landing', 'auth', 'onboarding'].includes(currentScreen);
+  const isFullscreenView = ['splash', 'landing', 'auth', 'onboarding', 'subscription'].includes(currentScreen);
+  const isPublicScreen = ['splash', 'landing', 'auth', 'onboarding', 'dashboard'].includes(currentScreen);
 
-  // Top Bar is shown ONLY for active, subscribed users who are inside workspace or viewing subscription manager.
-  // It is strictly hidden from users during registration on the subscription screen (when not subscribed).
-  const showTopBar = Boolean(userProfile.isOnboarded && userProfile.isSubscribed && !isFullscreenView);
-  const showWorkspaceChrome = Boolean(userProfile.isOnboarded && userProfile.isSubscribed && !isFullscreenView);
+  // Top Bar & Bottom Tab Bar are strictly hidden during registration, on the subscription screen,
+  // and whenever the user is not actively subscribed in workspace views.
+  const showTopBar = Boolean(
+    userProfile.isOnboarded &&
+    userProfile.isSubscribed &&
+    currentScreen !== 'subscription' &&
+    !isFullscreenView
+  );
+  const showWorkspaceChrome = Boolean(
+    userProfile.isOnboarded &&
+    userProfile.isSubscribed &&
+    currentScreen !== 'subscription' &&
+    !isFullscreenView
+  );
 
   const renderScreen = () => {
-    // If not subscribed and attempting to access workspace screens, gate to subscription screen
+    // If not subscribed and attempting to access other private screens, gate to subscription screen
     if (!userProfile.isSubscribed && !isPublicScreen) {
       return <SubscriptionScreen />;
     }

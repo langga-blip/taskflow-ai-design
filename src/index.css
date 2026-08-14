@@ -278,3 +278,42 @@ html::-webkit-scrollbar-thumb:hover {
   animation: aiTypingBounce 1.3s infinite ease-in-out;
   animation-delay: 0.4s;
 }
+
+/* Auth Input Pulse Error Animation & Shake */
+@keyframes inputPulseError {
+  0%, 100% {
+    border-color: #EF4444;
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7), 0 0 14px rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    border-color: #F87171;
+    box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.35), 0 0 24px rgba(239, 68, 68, 0.6);
+  }
+}
+
+@keyframes inputShakeSequence {
+  0%, 100% { transform: translateX(0); }
+  15%, 45%, 75% { transform: translateX(-5px); }
+  30%, 60%, 90% { transform: translateX(5px); }
+}
+
+.animate-input-pulse-error {
+  animation: inputPulseError 0.75s ease-in-out infinite, inputShakeSequence 0.45s ease-in-out 1;
+  will-change: transform, box-shadow, border-color;
+}
+
+@keyframes toastSlideDown {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -20px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.animate-toast-slide-down {
+  animation: toastSlideDown 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}

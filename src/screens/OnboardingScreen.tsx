@@ -8,6 +8,12 @@ import {
   getCountryByName,
 } from '../data/countriesData';
 import {
+  isEmailRegistered,
+  saveRegisteredEmail,
+  isPhoneRegistered,
+  saveRegisteredPhone,
+} from '../utils/registeredAccounts';
+import {
   Sparkles,
   Building2,
   ArrowRight,
@@ -21,6 +27,10 @@ import {
   Target,
   ShieldCheck,
   Check,
+  Mail,
+  User,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import { signInWithGoogle } from '../lib/firebase';
 
@@ -35,6 +45,8 @@ export const OnboardingScreen: React.FC = () => {
   const [googleAccountEmail, setGoogleAccountEmail] = useState('');
   const [isSigningInGoogle, setIsSigningInGoogle] = useState(false);
 
+  const [userName, setUserName] = useState(userProfile.userName || 'Alex Rivera');
+  const [workEmail, setWorkEmail] = useState(userProfile.userEmail || '');
   const [businessName, setBusinessName] = useState(userProfile.businessName || 'Apex Scale Agency');
   const [industry, setIndustry] = useState(userProfile.industry || 'Marketing Agency / Consulting');
   const [goal1, setGoal1] = useState(userProfile.goal1 || 'Reach $10,000 Monthly Recurring Revenue');
@@ -54,6 +66,12 @@ export const OnboardingScreen: React.FC = () => {
   const [password, setPassword] = useState('TaskFlowPass2026!');
   const [showPassword, setShowPassword] = useState(false);
 
+  // Duplicate detection & redirect states
+  const [isDuplicateError, setIsDuplicateError] = useState(false);
+  const [duplicateField, setDuplicateField] = useState<'email' | 'phone' | null>(null);
+  const [duplicateErrorMsg, setDuplicateErrorMsg] = useState('');
+  const [showRedirectToast, setShowRedirectToast] = useState(false);
+
   const handleGoogleSignIn = async () => {
     setIsSigningInGoogle(true);
     try {
@@ -61,8 +79,32 @@ export const OnboardingScreen: React.FC = () => {
       const displayName = res.user.displayName || 'Google User';
       const email = res.user.email || 'user@gmail.com';
 
+      // Check if Google email is already registered
+      if (isEmailRegistered(email, userProfile.userEmail)) {
+        setIsDuplicateError(true);
+        setDuplicateField('email');
+        setDuplicateErrorMsg(`Account for ${email} already exists. Redirecting you to Sign In...`);
+        setShowRedirectToast(true);
+
+        triggerNotification(
+          'Redirecting...',
+          `Account for ${email} already exists. Redirecting you to Sign In...`,
+          'SYSTEM',
+          'auth'
+        );
+
+        setTimeout(() => {
+          setIsDuplicateError(false);
+          setShowRedirectToast(false);
+          setCurrentScreen('auth');
+        }, 1700);
+        return;
+      }
+
       setGoogleConnected(true);
       setGoogleAccountEmail(email);
+      setWorkEmail(email);
+      if (displayName && !userName) setUserName(displayName);
 
       updateUserProfile({
         userName: displayName,
@@ -82,9 +124,10 @@ export const OnboardingScreen: React.FC = () => {
         console.warn('Google auth notice:', err);
       }
       // Fallback workspace connection if popup is closed or blocked
-      const mockEmail = userProfile.userEmail || 'executive.user@gmail.com';
+      const mockEmail = workEmail || userProfile.userEmail || 'executive.user@gmail.com';
       setGoogleConnected(true);
       setGoogleAccountEmail(mockEmail);
+      setWorkEmail(mockEmail);
       updateUserProfile({
         userName: userProfile.userName || 'Executive Founder',
         userEmail: mockEmail,
@@ -113,11 +156,84 @@ export const OnboardingScreen: React.FC = () => {
 
   const handleNextStep = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (currentStep === 1) {
       if (!businessName.trim()) return;
+
+      const cleanEmail = workEmail.trim().toLowerCase();
+      if (cleanEmail && isEmailRegistered(cleanEmail, userProfile.userEmail)) {
+        setIsDuplicateError(true);
+        setDuplicateField('email');
+        setDuplicateErrorMsg(`Account for ${cleanEmail} already exists. Redirecting you to Sign In...`);
+        setShowRedirectToast(true);
+
+        triggerNotification(
+          'Redirecting...',
+          `Account for ${cleanEmail} already exists. Redirecting you to Sign In...`,
+          'SYSTEM',
+          'auth'
+        );
+
+        setTimeout(() => {
+          setIsDuplicateError(false);
+          setShowRedirectToast(false);
+          setCurrentScreen('auth');
+        }, 1700);
+        return;
+      }
+
       setCurrentStep(2);
     } else if (currentStep === 2) {
       if (!password || password.length < 6) return;
+
+      const fullPhone = `${selectedCountry.dialCode} ${phoneDigits.trim()}`;
+      if (
+        isPhoneRegistered(fullPhone, userProfile.phoneNumber) ||
+        isPhoneRegistered(phoneDigits, userProfile.phoneNumber)
+      ) {
+        setIsDuplicateError(true);
+        setDuplicateField('phone');
+        setDuplicateErrorMsg(`Phone number ${fullPhone} is already registered. Redirecting you to Sign In...`);
+        setShowRedirectToast(true);
+
+        triggerNotification(
+          'Redirecting...',
+          `Phone number ${fullPhone} is already registered. Redirecting you to Sign In...`,
+          'SYSTEM',
+          'auth'
+        );
+
+        setTimeout(() => {
+          setIsDuplicateError(false);
+          setShowRedirectToast(false);
+          setCurrentScreen('auth');
+        }, 1700);
+        return;
+      }
+
+      // Re-verify email as well
+      const cleanEmail = workEmail.trim().toLowerCase();
+      if (cleanEmail && isEmailRegistered(cleanEmail, userProfile.userEmail)) {
+        setIsDuplicateError(true);
+        setDuplicateField('email');
+        setDuplicateErrorMsg(`Account for ${cleanEmail} already exists. Redirecting you to Sign In...`);
+        setShowRedirectToast(true);
+
+        triggerNotification(
+          'Redirecting...',
+          `Account for ${cleanEmail} already exists. Redirecting you to Sign In...`,
+          'SYSTEM',
+          'auth'
+        );
+
+        setTimeout(() => {
+          setIsDuplicateError(false);
+          setShowRedirectToast(false);
+          setCurrentScreen('auth');
+        }, 1700);
+        return;
+      }
+
       setCurrentStep(3);
     } else if (currentStep === 3) {
       handleFinishOnboarding();
@@ -126,10 +242,48 @@ export const OnboardingScreen: React.FC = () => {
 
   const handleFinishOnboarding = () => {
     const fullPhone = `${selectedCountry.dialCode} ${phoneDigits.trim()}`;
+    const cleanEmail = workEmail.trim().toLowerCase();
+
+    // Check again before final save
+    if (cleanEmail && isEmailRegistered(cleanEmail, userProfile.userEmail)) {
+      setIsDuplicateError(true);
+      setDuplicateField('email');
+      setDuplicateErrorMsg(`Account for ${cleanEmail} already exists. Redirecting you to Sign In...`);
+      setShowRedirectToast(true);
+      setTimeout(() => {
+        setIsDuplicateError(false);
+        setShowRedirectToast(false);
+        setCurrentScreen('auth');
+      }, 1700);
+      return;
+    }
+
+    if (
+      isPhoneRegistered(fullPhone, userProfile.phoneNumber) ||
+      isPhoneRegistered(phoneDigits, userProfile.phoneNumber)
+    ) {
+      setIsDuplicateError(true);
+      setDuplicateField('phone');
+      setDuplicateErrorMsg(`Phone number ${fullPhone} is already registered. Redirecting you to Sign In...`);
+      setShowRedirectToast(true);
+      setTimeout(() => {
+        setIsDuplicateError(false);
+        setShowRedirectToast(false);
+        setCurrentScreen('auth');
+      }, 1700);
+      return;
+    }
+
+    // Save new account credentials
+    if (cleanEmail) saveRegisteredEmail(cleanEmail);
+    if (fullPhone) saveRegisteredPhone(fullPhone);
+
     const parsedRev = typeof targetRevenue === 'string' ? parseFloat(targetRevenue) : targetRevenue;
     const finalRev = isNaN(parsedRev) || parsedRev < 0 ? 0 : parsedRev;
 
     updateUserProfile({
+      userName: userName.trim() || userProfile.userName || 'Alex Rivera',
+      userEmail: cleanEmail || userProfile.userEmail || 'alex@apexscale.com',
       businessName,
       industry,
       goal1,
@@ -161,6 +315,34 @@ export const OnboardingScreen: React.FC = () => {
         isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#0A0C14] text-white'
       }`}
     >
+      {/* Floating Redirecting... Toast Notification */}
+      {showRedirectToast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-toast-slide-down pointer-events-none w-[90%] max-w-md">
+          <div
+            className={`border rounded-2xl p-4 flex items-center gap-3.5 shadow-2xl backdrop-blur-xl ${
+              isLight
+                ? 'bg-white/95 border-red-400 text-slate-900 shadow-[0_10px_30px_rgba(239,68,68,0.25)]'
+                : 'bg-[#131726]/95 border-red-500/80 text-white shadow-[0_0_35px_rgba(239,68,68,0.45)]'
+            }`}
+          >
+            <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/60 flex items-center justify-center shrink-0 animate-pulse">
+              <AlertCircle className="w-5 h-5 text-red-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-sm text-red-500">Redirecting...</h4>
+                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 font-semibold">
+                  <Loader2 className="w-3 h-3 animate-spin text-red-500" /> Account Exists
+                </span>
+              </div>
+              <p className={`text-xs truncate mt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                {duplicateErrorMsg}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-xl sm:max-w-2xl w-full space-y-6 my-auto z-10">
         {/* Top Navigation Bar with Dedicated Back Button */}
         <div className="flex items-center justify-between pb-1">
@@ -260,6 +442,20 @@ export const OnboardingScreen: React.FC = () => {
         </div>
 
         <GlassCard className="p-6 sm:p-8 space-y-5">
+          {/* Inline Error Notice on Duplicate Attempt */}
+          {isDuplicateError && (
+            <div className="p-3 rounded-xl border border-red-500/80 bg-red-500/10 text-xs flex items-center gap-2.5 animate-input-pulse-error shadow-[0_0_20px_rgba(239,68,68,0.35)]">
+              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+              <div className="flex-1 min-w-0">
+                <span className="font-bold text-red-400 block">{duplicateErrorMsg}</span>
+                <span className={`text-[11px] ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                  Redirecting you to Sign In...
+                </span>
+              </div>
+              <Loader2 className="w-4 h-4 animate-spin text-red-500 shrink-0" />
+            </div>
+          )}
+
           <form onSubmit={handleNextStep} className="space-y-4">
             {/* STEP 1: BUSINESS & PROFILE BASICS */}
             {currentStep === 1 && (
@@ -323,6 +519,67 @@ export const OnboardingScreen: React.FC = () => {
                   >
                     Business Profile Information
                   </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1">
+                      Full Name
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        required
+                        value={userName}
+                        onChange={(e) => {
+                          setUserName(e.target.value);
+                          if (isDuplicateError) setIsDuplicateError(false);
+                        }}
+                        placeholder="Alex Rivera"
+                        className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                          isLight
+                            ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
+                            : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 flex items-center justify-between">
+                      <span>Work Email</span>
+                      {isDuplicateError && duplicateField === 'email' ? (
+                        <span className="text-[10px] text-red-400 font-bold animate-pulse">Already Registered</span>
+                      ) : (
+                        <span className="text-[10px] text-[#06B6D4] font-medium">Business Inbox</span>
+                      )}
+                    </label>
+                    <div className="relative">
+                      <Mail
+                        className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                          isDuplicateError && duplicateField === 'email' ? 'text-red-500' : 'text-slate-400'
+                        }`}
+                      />
+                      <input
+                        type="email"
+                        required
+                        value={workEmail}
+                        onChange={(e) => {
+                          setWorkEmail(e.target.value);
+                          if (isDuplicateError) setIsDuplicateError(false);
+                        }}
+                        placeholder="alex@apexscale.com"
+                        className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none ${
+                          isDuplicateError && duplicateField === 'email'
+                            ? 'border-red-500 ring-2 ring-red-500/50 bg-red-500/10 text-red-200'
+                            : isLight
+                            ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm focus:border-[#7C3AED]'
+                            : 'bg-[#0A0C14] border-[#2E3552] text-white focus:border-[#7C3AED]'
+                        }`}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -417,13 +674,18 @@ export const OnboardingScreen: React.FC = () => {
 
                 {/* Phone Number Field */}
                 <div>
-                  <label className="block text-xs font-semibold mb-1">
-                    Phone Number ({selectedCountry.dialCode})
+                  <label className="block text-xs font-semibold mb-1 flex items-center justify-between">
+                    <span>Phone Number ({selectedCountry.dialCode})</span>
+                    {isDuplicateError && duplicateField === 'phone' && (
+                      <span className="text-[10px] text-red-400 font-bold animate-pulse">Already Registered</span>
+                    )}
                   </label>
                   <div className="flex items-center gap-2">
                     <div
                       className={`px-3 py-2.5 rounded-xl border font-mono text-xs font-bold flex items-center gap-1.5 shrink-0 ${
-                        isLight
+                        isDuplicateError && duplicateField === 'phone'
+                          ? 'bg-red-500/20 border-red-500 text-red-300'
+                          : isLight
                           ? 'bg-slate-200 border-slate-300 text-slate-800'
                           : 'bg-[#1E2338] border-[#2E3552] text-slate-200'
                       }`}
@@ -432,17 +694,26 @@ export const OnboardingScreen: React.FC = () => {
                       <span>{selectedCountry.dialCode}</span>
                     </div>
                     <div className="relative flex-1">
-                      <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <Phone
+                        className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+                          isDuplicateError && duplicateField === 'phone' ? 'text-red-500' : 'text-slate-400'
+                        }`}
+                      />
                       <input
                         type="tel"
                         required
                         value={phoneDigits}
-                        onChange={(e) => setPhoneDigits(e.target.value)}
+                        onChange={(e) => {
+                          setPhoneDigits(e.target.value);
+                          if (isDuplicateError) setIsDuplicateError(false);
+                        }}
                         placeholder="801 234 5678"
-                        className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
-                          isLight
-                            ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
-                            : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                        className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none ${
+                          isDuplicateError && duplicateField === 'phone'
+                            ? 'border-red-500 ring-2 ring-red-500/50 bg-red-500/10 text-red-200'
+                            : isLight
+                            ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm focus:border-[#7C3AED]'
+                            : 'bg-[#0A0C14] border-[#2E3552] text-white focus:border-[#7C3AED]'
                         }`}
                       />
                     </div>

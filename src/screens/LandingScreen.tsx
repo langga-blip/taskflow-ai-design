@@ -94,14 +94,18 @@ export const LandingScreen: React.FC = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4 max-w-lg mx-auto w-full">
-          <NeonButton onClick={() => setCurrentScreen('onboarding')} size="md" className="w-full sm:w-auto px-6 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md">
+          <NeonButton
+            onClick={() => setCurrentScreen('onboarding')}
+            size="md"
+            className="w-full sm:w-auto px-6 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md cursor-pointer"
+          >
             Get Started Now <ArrowRight className="w-4 h-4" />
           </NeonButton>
           <NeonButton
             onClick={() => setCurrentScreen('auth')}
             variant="secondary"
             size="md"
-            className="w-full sm:w-auto px-6 py-3 text-sm font-bold flex items-center justify-center gap-2"
+            className="w-full sm:w-auto px-6 py-3 text-sm font-bold flex items-center justify-center gap-2 cursor-pointer"
           >
             I Already Have an Account &rarr;
           </NeonButton>

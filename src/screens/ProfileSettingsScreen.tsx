@@ -21,6 +21,8 @@ import {
   Sun,
   Moon,
   Phone,
+  Mail,
+  User,
 } from 'lucide-react';
 
 export const ProfileSettingsScreen: React.FC = () => {
@@ -36,6 +38,7 @@ export const ProfileSettingsScreen: React.FC = () => {
   const isLight = userProfile.themeMode === 'Light';
 
   const [userName, setUserName] = useState(userProfile.userName);
+  const [userEmail, setUserEmail] = useState(userProfile.userEmail || '');
   const [businessName, setBusinessName] = useState(userProfile.businessName);
   const [industry, setIndustry] = useState(userProfile.industry);
   const [gender, setGender] = useState(userProfile.gender || 'Prefer not to say');
@@ -63,6 +66,7 @@ export const ProfileSettingsScreen: React.FC = () => {
 
     updateUserProfile({
       userName,
+      userEmail,
       businessName,
       industry,
       gender,
@@ -182,35 +186,63 @@ export const ProfileSettingsScreen: React.FC = () => {
         </h2>
 
         <form onSubmit={handleSaveProfile} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-semibold mb-1">Full Name</label>
-              <input
-                type="text"
-                required
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
-                  isLight
-                    ? 'bg-slate-100 border-slate-300 text-slate-900'
-                    : 'bg-[#0A0C14] border-[#2E3552] text-white'
-                }`}
-              />
+              <div className="relative">
+                <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  required
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                    isLight
+                      ? 'bg-slate-100 border-slate-300 text-slate-900'
+                      : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold mb-1 flex items-center justify-between">
+                <span>Work Email</span>
+                <span className="text-[10px] text-[#06B6D4]">Inbox Sync</span>
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="email"
+                  required
+                  value={userEmail}
+                  onChange={(e) => setUserEmail(e.target.value)}
+                  placeholder="alex@apexscale.com"
+                  className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                    isLight
+                      ? 'bg-slate-100 border-slate-300 text-slate-900'
+                      : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                  }`}
+                />
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-semibold mb-1">Company Name</label>
-              <input
-                type="text"
-                required
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
-                  isLight
-                    ? 'bg-slate-100 border-slate-300 text-slate-900'
-                    : 'bg-[#0A0C14] border-[#2E3552] text-white'
-                }`}
-              />
+              <div className="relative">
+                <Building2 className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  required
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                    isLight
+                      ? 'bg-slate-100 border-slate-300 text-slate-900'
+                      : 'bg-[#0A0C14] border-[#2E3552] text-white'
+                  }`}
+                />
+              </div>
             </div>
           </div>
 

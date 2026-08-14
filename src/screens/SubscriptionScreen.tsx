@@ -301,28 +301,26 @@ export const SubscriptionScreen: React.FC = () => {
 
   return (
     <div className="space-y-7 pt-2 pb-32 px-3 sm:px-6 max-w-4xl mx-auto animate-fade-in overflow-x-hidden">
-      {/* Top back navigation button when user is unregistered or unpaid */}
-      {(!userProfile.isSubscribed || !userProfile.isOnboarded) && (
-        <div className="flex items-center justify-between pb-1">
-          <button
-            type="button"
-            onClick={() => setCurrentScreen(userProfile.isOnboarded ? 'dashboard' : 'auth')}
-            className={`py-2 px-3.5 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${
-              isLight
-                ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
-                : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white hover:border-slate-500'
-            }`}
-          >
-            <ArrowLeft className="w-4 h-4 text-[#06B6D4]" />
-            <span>Back to {userProfile.isOnboarded ? 'Workspace' : 'Sign In'}</span>
-          </button>
-          
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] font-bold text-amber-400">
-            <Lock className="w-3 h-3" />
-            <span>Secure Access Gateway</span>
-          </div>
+      {/* Top back navigation button */}
+      <div className="flex items-center justify-between pb-1">
+        <button
+          type="button"
+          onClick={() => setCurrentScreen(userProfile.isOnboarded ? 'dashboard' : 'auth')}
+          className={`py-2 px-3.5 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${
+            isLight
+              ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
+              : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white hover:border-slate-500'
+          }`}
+        >
+          <ArrowLeft className="w-4 h-4 text-[#06B6D4]" />
+          <span>Back to {userProfile.isOnboarded ? 'Workspace' : 'Sign In'}</span>
+        </button>
+        
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] font-bold text-amber-400">
+          <Lock className="w-3 h-3" />
+          <span>Secure Access Gateway</span>
         </div>
-      )}
+      </div>
 
       {/* Header Badge & Title */}
       <div className="text-center space-y-3 pb-2">
