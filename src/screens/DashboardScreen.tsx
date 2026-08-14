@@ -69,16 +69,10 @@ export const DashboardScreen: React.FC = () => {
     userProfile.currentMonthlyRevenue !== undefined ? userProfile.currentMonthlyRevenue : 3450
   );
 
-  useEffect(() => {
-    if (isEditRevModalOpen) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [isEditRevModalOpen]);
-
   // Revenue metrics
-  const revGoal = userProfile.monthlyRevenueGoal || 10000;
+  const revGoal = userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 0;
   const currentRev = userProfile.currentMonthlyRevenue !== undefined ? userProfile.currentMonthlyRevenue : 0;
-  const revPercent = revGoal > 0 ? Math.min(100, Math.round((currentRev / revGoal) * 100)) : 0;
+  const revPercent = revGoal > 0 ? Math.min(100, Math.round((currentRev / revGoal) * 100)) : (currentRev > 0 ? 100 : 0);
   const isLight = userProfile.themeMode === 'Light';
 
   const handleSaveRevenueFromDashboard = (e: React.FormEvent) => {
@@ -535,8 +529,8 @@ export const DashboardScreen: React.FC = () => {
 
       {/* Edit Revenue Modal */}
       {isEditRevModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className={`w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 border ${
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className={`w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 border animate-scale-up ${
             isLight ? 'bg-white border-purple-200 text-slate-900' : 'bg-[#0A0C14] border-[#2E3552] text-white'
           }`}>
             <div className={`flex items-center justify-between pb-3 border-b ${

@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { NeonButton } from '../components/NeonButton';
 import { FormattedTextWithAppEmojis, AppEmoji } from '../components/AppEmoji';
-import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Wand2, Volume2, Image as ImageIcon, X } from 'lucide-react';
+import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Wand2, Volume2, Image as ImageIcon, X, Eye, ChevronDown } from 'lucide-react';
 import { speakWithAlexaVoice } from '../utils/speechUtils';
 import { autoCorrectText } from '../utils/autoCorrect';
 
@@ -47,7 +47,7 @@ export const AiAssistantScreen: React.FC = () => {
       {
         id: '1',
         sender: 'assistant',
-        text: `Hello ${userProfile.userName || 'Executive'}! 👋 I am your 24/7 Executive AI Business Assistant.\n\nI am actively monitoring your **Google Drive, Calendar, and Gmail** (${userProfile.userEmail || 'Connected'}).\n\nHow can I assist you with scaling **${userProfile.businessName}** today?\n\n• **Gmail Smart Response**: AI detected incoming client inquiries with automated high-converting replies.\n• **Proposal Generator**: Draft high-converting client retainer proposals.\n• **Revenue Optimization**: Action plans to reach your **${userProfile.currencySymbol}${(userProfile.monthlyRevenueGoal || 10000).toLocaleString()}** goal.`,
+        text: `Hello ${userProfile.userName || 'Executive'}! 👋 I am your 24/7 Executive AI Assistant.\n\nI am actively monitoring your **Google Drive, Calendar, and Gmail** (${userProfile.userEmail || 'Connected'}).\n\nHow can I assist you with **${userProfile.businessName}** today?\n\n• **Open Interactive Chat**: Ask anything, brainstorm ideas, draft emails, or roleplay scenarios.\n• **Image & Document Vision**: Attach any photo, chart, screenshot, or contract for deep visual analysis.\n• **Revenue Optimization**: Tailored action plans for your **${userProfile.currencySymbol}${(userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 0).toLocaleString()}** goal.`,
         timestamp: 'Just now',
       },
     ];
@@ -68,6 +68,7 @@ export const AiAssistantScreen: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -89,10 +90,44 @@ export const AiAssistantScreen: React.FC = () => {
     if (file) {
       const reader = new FileReader();
       reader.onload = () => {
-        setSelectedImage(reader.result as string);
-        triggerNotification('Image Attached 🖼️', 'Image uploaded successfully. Ask AI to analyze it!', 'SYSTEM');
+        const result = reader.result as string;
+        // Check image dimension & compress gently only if extraordinarily huge (> 2400px)
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 2048;
+          if (img.width > maxDim || img.height > maxDim) {
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'high';
+              ctx.drawImage(img, 0, 0, width, height);
+              const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+              setSelectedImage(compressedDataUrl);
+            } else {
+              setSelectedImage(result);
+            }
+          } else {
+            setSelectedImage(result);
+          }
+          triggerNotification('Image Attached 🖼️', 'Image uploaded successfully. AI is ready to analyze every detail!', 'SYSTEM');
+        };
+        img.src = result;
       };
       reader.readAsDataURL(file);
+      // Reset input value so user can re-select the same image if needed
+      e.target.value = '';
     }
   };
 
@@ -113,43 +148,6 @@ export const AiAssistantScreen: React.FC = () => {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [showConfirmSendModal, setShowConfirmSendModal] = useState(false);
   const [emailSentSuccess, setEmailSentSuccess] = useState(false);
-  const [isListeningVoice, setIsListeningVoice] = useState(false);
-  const voiceControllerRef = useRef<VoiceRecognizerController | null>(null);
-
-  const toggleVoiceInput = async () => {
-    if (isListeningVoice) {
-      if (voiceControllerRef.current) {
-        voiceControllerRef.current.stop();
-      }
-      setIsListeningVoice(false);
-      return;
-    }
-
-    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-      try {
-        navigator.vibrate(50);
-      } catch (e) {}
-    }
-
-    setIsListeningVoice(true);
-    triggerNotification('Voice Input Active 🎙️', 'Speak your query clearly into the microphone...', 'SYSTEM');
-
-    const controller = createVoiceRecognizer(
-      (transcribedText) => {
-        setInputText(transcribedText);
-      },
-      (errorMsg) => {
-        triggerNotification('Microphone Notice', errorMsg, 'SYSTEM');
-        setIsListeningVoice(false);
-      },
-      () => {
-        setIsListeningVoice(false);
-      }
-    );
-
-    voiceControllerRef.current = controller;
-    await controller.start();
-  };
 
   const handleAutoCorrect = () => {
     if (!inputText.trim()) return;
@@ -217,10 +215,12 @@ export const AiAssistantScreen: React.FC = () => {
 
     try {
       const promptWithImgContext = attachedImg
-        ? `[User attached an image file]. Prompt: ${textToSend}`
+        ? (textToSend && textToSend !== 'Attached Image Analysis Request'
+            ? textToSend
+            : 'Please thoroughly analyze and inspect every detail of this attached image. Transcribe all text, numbers, layout structures, diagrams, patterns, and provide an executive strategic breakdown.')
         : textToSend;
 
-      const aiReply = await askAssistant(promptWithImgContext);
+      const aiReply = await askAssistant(promptWithImgContext, attachedImg || undefined);
 
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -380,21 +380,29 @@ export const AiAssistantScreen: React.FC = () => {
               <Trash2 className="w-3.5 h-3.5" />
             </button>
 
-            <div className="flex items-center gap-1.5">
-              <Cpu className={`w-4 h-4 ${isLight ? 'text-purple-600' : 'text-[#A78BFA]'}`} />
-              <select
-                value={aiProvider}
-                onChange={(e) => setAiProvider(e.target.value as any)}
-                className={`border rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none cursor-pointer ${
-                  isLight
-                    ? 'bg-white border-purple-300 text-purple-900 focus:border-purple-500'
-                    : 'bg-[#0A0C14] border-[#2E3552] text-[#06B6D4] focus:border-[#06B6D4]'
-                }`}
-              >
-                <option value="GEMINI">Gemini 3.5 Flash (Default)</option>
-                <option value="OPENAI">OpenAI GPT-4o</option>
-                <option value="DEEPSEEK">DeepSeek R1</option>
-              </select>
+            <div className="flex items-center gap-2">
+              <span className={`text-[11px] font-bold uppercase tracking-wider hidden sm:inline ${
+                isLight ? 'text-purple-900' : 'text-slate-400'
+              }`}>
+                AI Engine:
+              </span>
+              <div className="relative inline-flex items-center">
+                <Cpu className={`w-3.5 h-3.5 absolute left-2.5 pointer-events-none ${isLight ? 'text-purple-600' : 'text-[#A78BFA]'}`} />
+                <select
+                  value={aiProvider}
+                  onChange={(e) => setAiProvider(e.target.value as any)}
+                  className={`appearance-none border rounded-xl pl-8 pr-7 py-1.5 text-xs font-bold focus:outline-none cursor-pointer shadow-sm transition-all ${
+                    isLight
+                      ? 'bg-white border-purple-300 text-purple-900 focus:border-purple-500'
+                      : 'bg-[#0A0C14] border-[#2E3552] text-[#06B6D4] focus:border-[#06B6D4]'
+                  }`}
+                >
+                  <option value="GEMINI">Gemini 3.7 Flash (Default)</option>
+                  <option value="OPENAI">OpenAI GPT-4o (Active)</option>
+                  <option value="DEEPSEEK">DeepSeek R1 (Active)</option>
+                </select>
+                <ChevronDown className={`w-3.5 h-3.5 absolute right-2 pointer-events-none ${isLight ? 'text-purple-700' : 'text-slate-400'}`} />
+              </div>
             </div>
           </div>
         </div>
@@ -495,7 +503,7 @@ export const AiAssistantScreen: React.FC = () => {
 
       {/* Confirmation Modal before sending email */}
       {showConfirmSendModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <GlassCard className="max-w-md w-full p-6 space-y-4 border-amber-500/40">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
@@ -612,13 +620,24 @@ export const AiAssistantScreen: React.FC = () => {
                 {m.sender === 'assistant' ? (
                   renderFormattedText(m.text)
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
+                    {/* Neat Image Display on Top of Message */}
                     {m.imageUrl && (
-                      <div className="rounded-xl overflow-hidden max-w-xs border border-purple-300/30">
-                        <img src={m.imageUrl} alt="Attached input" className="w-full h-auto object-cover max-h-48" />
+                      <div className="rounded-xl overflow-hidden border border-white/25 bg-black/20 shadow-md group relative">
+                        <img
+                          src={m.imageUrl}
+                          alt="Attached input"
+                          onClick={() => setPreviewModalImage(m.imageUrl || null)}
+                          className="w-full h-auto object-cover max-h-56 cursor-zoom-in transition-transform duration-200 group-hover:scale-[1.02]"
+                        />
+                        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] text-white/90 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          <Eye className="w-3 h-3" /> Tap to zoom
+                        </div>
                       </div>
                     )}
-                    <p className="whitespace-pre-line leading-relaxed">{m.text}</p>
+                    {m.text && (
+                      <p className="whitespace-pre-line leading-relaxed font-medium">{m.text}</p>
+                    )}
                   </div>
                 )}
 
@@ -669,14 +688,28 @@ export const AiAssistantScreen: React.FC = () => {
           ))}
 
           {isTyping && (
-            <div
-              className={`flex items-center gap-2 text-xs p-3 rounded-xl w-fit animate-pulse ${
-                isLight
-                  ? 'bg-purple-100 border border-purple-200 text-purple-900 font-semibold'
-                  : 'bg-[#131726] border border-[#2E3552] text-[#06B6D4]'
-              }`}
-            >
-              <Sparkles className="w-4 h-4 animate-spin text-purple-600" /> AI is formulating a strategic recommendation...
+            <div className="flex items-start gap-2.5 max-w-[85%] animate-fade-in">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#7C3AED] to-[#06B6D4] flex items-center justify-center text-white flex-shrink-0 shadow-[0_0_14px_rgba(124,58,237,0.5)]">
+                <Bot className="w-4 h-4" />
+              </div>
+              <div
+                className={`p-3.5 rounded-2xl rounded-tl-sm border shadow-md space-y-1.5 ${
+                  isLight
+                    ? 'bg-purple-50/95 border-purple-200 text-purple-950 shadow-purple-100/50'
+                    : 'bg-[#131726]/95 border-[#2E3552] text-slate-100 shadow-[0_4px_20px_rgba(0,0,0,0.3)]'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 px-1 py-1">
+                    <span className="w-2 h-2 rounded-full bg-[#06B6D4] ai-typing-dot-1" />
+                    <span className="w-2 h-2 rounded-full bg-[#7C3AED] ai-typing-dot-2" />
+                    <span className="w-2 h-2 rounded-full bg-[#06B6D4] ai-typing-dot-3" />
+                  </div>
+                  <span className={`text-[11px] font-semibold tracking-wide ${isLight ? 'text-purple-800' : 'text-cyan-300'}`}>
+                    AI is thinking...
+                  </span>
+                </div>
+              </div>
             </div>
           )}
 
@@ -797,6 +830,42 @@ export const AiAssistantScreen: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Full-Detail Image Inspection Lightbox Modal */}
+      {previewModalImage && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setPreviewModalImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] bg-[#131726] border border-purple-500/40 rounded-2xl overflow-hidden shadow-2xl p-2 flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between px-3 py-2 border-b border-purple-500/20 text-xs text-purple-300 font-semibold">
+              <span>Full Resolution Image Inspector</span>
+              <button
+                type="button"
+                onClick={() => setPreviewModalImage(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="overflow-auto max-h-[75vh] w-full flex items-center justify-center p-2">
+              <img
+                src={previewModalImage}
+                alt="Enlarged inspection"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
+              />
+            </div>
+            <div className="w-full text-center py-2 text-[11px] text-slate-400 border-t border-purple-500/10">
+              AI Vision Engine is analyzing every detail, line, text, and structure of this asset.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

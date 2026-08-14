@@ -35,7 +35,7 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   return (
     <div
       onClick={onClick}
-      className={`${baseThemeClasses} rounded-2xl p-5 transition-all duration-200 ${hoverClasses} ${
+      className={`${baseThemeClasses} glass-card rounded-2xl p-5 transition-colors duration-150 ${hoverClasses} ${
         onClick ? 'cursor-pointer' : ''
       } ${className}`}
     >

@@ -174,7 +174,7 @@ export const WorkflowTemplatesScreen: React.FC = () => {
       {selectedTemplate && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 pb-24 sm:pb-6 bg-black/80 backdrop-blur-md animate-fade-in">
           <div
-            className={`w-full max-w-lg rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col max-h-[68vh] sm:max-h-[78vh] border relative ${
+            className={`w-full max-w-lg rounded-3xl p-4 sm:p-5 shadow-2xl flex flex-col max-h-[68vh] sm:max-h-[78vh] border relative animate-scale-up ${
               isLight ? 'bg-white border-purple-300 text-slate-900' : 'bg-[#0A0C14] border-[#2E3552] text-white'
             }`}
           >

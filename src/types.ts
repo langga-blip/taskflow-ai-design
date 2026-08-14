@@ -46,6 +46,8 @@ export interface UserProfile {
   isSubscribed: boolean;
   subscriptionExpiryDate: string;
   subscriptionTimestampMs: number;
+  subscriptionExpiryMs?: number;
+  subscriptionDuration?: '1_MONTH' | '3_MONTHS' | '6_MONTHS' | '1_YEAR';
   isOnboarded: boolean;
 }
 

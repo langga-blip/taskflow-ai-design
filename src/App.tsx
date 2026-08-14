@@ -34,8 +34,19 @@ const MainAppContent: React.FC = () => {
   }, [isLight]);
 
   const isFullscreenView = ['splash', 'landing', 'auth', 'onboarding'].includes(currentScreen);
+  const isPublicScreen = ['splash', 'landing', 'auth', 'onboarding'].includes(currentScreen);
+
+  // Top Bar is shown ONLY for active, subscribed users who are inside workspace or viewing subscription manager.
+  // It is strictly hidden from users during registration on the subscription screen (when not subscribed).
+  const showTopBar = Boolean(userProfile.isOnboarded && userProfile.isSubscribed && !isFullscreenView);
+  const showWorkspaceChrome = Boolean(userProfile.isOnboarded && userProfile.isSubscribed && !isFullscreenView);
 
   const renderScreen = () => {
+    // If not subscribed and attempting to access workspace screens, gate to subscription screen
+    if (!userProfile.isSubscribed && !isPublicScreen) {
+      return <SubscriptionScreen />;
+    }
+
     switch (currentScreen) {
       case 'splash':
         return <SplashScreen />;
@@ -77,19 +88,19 @@ const MainAppContent: React.FC = () => {
       }`}
     >
       {/* Header Bar - Fixed pinned to top of viewport with z-index 50 */}
-      {!isFullscreenView && (
+      {showTopBar && (
         <div className="fixed top-0 left-0 right-0 z-50">
           <HeaderBar />
         </div>
       )}
 
       {/* Screen Body */}
-      <main className={!isFullscreenView ? 'pt-[80px] sm:pt-[88px] pb-24 px-4 sm:px-6 max-w-7xl mx-auto' : ''}>
+      <main className={isFullscreenView ? '' : showTopBar ? 'pt-[80px] sm:pt-[88px] pb-24 px-4 sm:px-6 max-w-7xl mx-auto' : 'pt-4 pb-24 px-4 sm:px-6 max-w-7xl mx-auto'}>
         {renderScreen()}
       </main>
 
       {/* Floating Elements & Sheets */}
-      {!isFullscreenView && (
+      {showWorkspaceChrome && (
         <>
           <CustomBottomNavBar />
           <FloatingAssistantOverlay />

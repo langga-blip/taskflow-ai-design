@@ -422,7 +422,14 @@ export const FloatingAssistantOverlay: React.FC = () => {
               >
                 <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
                   <span>TRANSCRIPTION / RESPONSE</span>
-                  {isThinking && <span className="text-[#06B6D4] animate-pulse">Thinking...</span>}
+                  {isThinking && (
+                    <div className="flex items-center gap-1 text-[#06B6D4]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] ai-typing-dot-1" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#7C3AED] ai-typing-dot-2" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] ai-typing-dot-3" />
+                      <span className="ml-1 text-[10px] font-bold">Thinking...</span>
+                    </div>
+                  )}
                 </div>
                 <p className="leading-relaxed">
                   {response || transcript || 'Tap the microphone below or ask any question to speak with Task Flow AI.'}

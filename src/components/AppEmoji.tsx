@@ -262,12 +262,12 @@ export const FormattedTextWithAppEmojis: React.FC<{ text: string; className?: st
   const parts = text.split(emojiRegex);
 
   return (
-    <span className={`inline-wrap items-center gap-1.5 ${className}`}>
+    <span className={`inline align-baseline ${className}`}>
       {parts.map((part, idx) => {
         if (emojiRegex.test(part)) {
-          return <AppEmoji key={idx} symbolOrName={part} size="sm" />;
+          return <AppEmoji key={idx} symbolOrName={part} size="sm" className="mx-1 align-middle" />;
         }
-        return <span key={idx} className="whitespace-pre-wrap">{part}</span>;
+        return <span key={idx}>{part}</span>;
       })}
     </span>
   );

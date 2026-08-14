@@ -140,7 +140,7 @@ export const VoiceCommandSheet: React.FC = () => {
       className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fade-in"
     >
       <div
-        className={`w-full max-w-lg max-h-[85vh] rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4 overflow-y-auto scrollbar-none my-auto border transition-colors ${
+        className={`w-full max-w-lg max-h-[85vh] rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4 overflow-y-auto scrollbar-none my-auto border transition-colors animate-scale-up ${
           isLight
             ? 'bg-white border-purple-300 text-slate-900'
             : 'bg-[#0A0C14] border-[#2E3552] text-white'

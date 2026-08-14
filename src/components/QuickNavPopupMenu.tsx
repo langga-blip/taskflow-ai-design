@@ -20,6 +20,17 @@ export const QuickNavPopupMenu: React.FC = () => {
 
   if (!isQuickNavOpen) return null;
 
+  const durationLabelMap: Record<string, string> = {
+    '1_MONTH': 'Monthly',
+    '3_MONTHS': '3 Months',
+    '6_MONTHS': '6 Months',
+    '1_YEAR': 'Annual',
+  };
+
+  const activeDurationLabel = userProfile.subscriptionDuration
+    ? durationLabelMap[userProfile.subscriptionDuration] || 'Pro'
+    : 'Pro';
+
   const routes: { id: ScreenRoute; name: string; desc: string; icon: React.ReactNode; badge?: string }[] = [
     {
       id: 'dashboard',
@@ -71,7 +82,7 @@ export const QuickNavPopupMenu: React.FC = () => {
     },
     {
       id: 'subscription',
-      name: 'TaskFlow AI Pro Annual',
+      name: userProfile.isSubscribed ? `TaskFlow AI Pro ${activeDurationLabel}` : 'TaskFlow AI Pro Access',
       desc: 'Unlock all AI tools & global currencies',
       icon: <Crown className="w-5 h-5 text-amber-400" />,
       badge: userProfile.isSubscribed ? 'Active' : 'Upgrade',
@@ -90,10 +101,10 @@ export const QuickNavPopupMenu: React.FC = () => {
           setIsQuickNavOpen(false);
         }
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
     >
       <div
-        className={`w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4 border transition-colors ${
+        className={`w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-4 border transition-colors animate-scale-up ${
           isLight
             ? 'bg-white border-purple-300 text-slate-900'
             : 'bg-[#0A0C14] border-[#2E3552] text-white'
@@ -140,7 +151,7 @@ export const QuickNavPopupMenu: React.FC = () => {
                 {r.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
                   <span
                     className={`font-bold text-xs truncate ${
                       isLight ? 'text-slate-900 group-hover:text-purple-700' : 'text-white group-hover:text-[#06B6D4]'
@@ -149,7 +160,7 @@ export const QuickNavPopupMenu: React.FC = () => {
                     {r.name}
                   </span>
                   {r.badge && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">
+                    <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30 flex-shrink-0">
                       {r.badge}
                     </span>
                   )}

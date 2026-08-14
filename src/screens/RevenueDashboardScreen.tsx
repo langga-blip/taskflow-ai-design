@@ -40,18 +40,12 @@ export const RevenueDashboardScreen: React.FC = () => {
 
   const [isEditGoalOpen, setIsEditGoalOpen] = useState(false);
   const [newTargetGoal, setNewTargetGoal] = useState<string | number>(
-    userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 10000
+    userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 0
   );
 
-  useEffect(() => {
-    if (isEditRevenueOpen || isEditGoalOpen || isLogIncomeOpen || isCurrencyModalOpen) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [isEditRevenueOpen, isEditGoalOpen, isLogIncomeOpen, isCurrencyModalOpen]);
-
   const currentRev = userProfile.currentMonthlyRevenue !== undefined ? userProfile.currentMonthlyRevenue : 0;
-  const revGoal = userProfile.monthlyRevenueGoal || 10000;
-  const percentAchieved = revGoal > 0 ? Math.min(100, Math.round((currentRev / revGoal) * 100)) : 0;
+  const revGoal = userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 0;
+  const percentAchieved = revGoal > 0 ? Math.min(100, Math.round((currentRev / revGoal) * 100)) : (currentRev > 0 ? 100 : 0);
   const isLight = userProfile.themeMode === 'Light';
 
   const handleSaveRevenue = (e: React.FormEvent) => {
@@ -90,10 +84,10 @@ export const RevenueDashboardScreen: React.FC = () => {
   const handleSaveGoal = (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = typeof newTargetGoal === 'string' ? parseFloat(newTargetGoal) : newTargetGoal;
-    if (isNaN(parsed) || parsed <= 0) return;
+    const finalGoal = isNaN(parsed) || parsed < 0 ? 0 : parsed;
 
-    updateUserProfile({ monthlyRevenueGoal: parsed });
-    triggerNotification('Revenue Goal Updated', `Monthly target set to ${formatRevenue(parsed, false)}.`, 'SYSTEM');
+    updateUserProfile({ monthlyRevenueGoal: finalGoal });
+    triggerNotification('Revenue Goal Updated', `Monthly target set to ${formatRevenue(finalGoal, false)}.`, 'SYSTEM');
     setIsEditGoalOpen(false);
   };
 
@@ -254,7 +248,7 @@ export const RevenueDashboardScreen: React.FC = () => {
 
       {/* Currency Switcher Modal */}
       {isCurrencyModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
           <div className="w-full max-w-lg bg-[#0A0C14] border border-[#2E3552] rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-[#2E3552] pb-3">
               <h2 className="font-bold text-lg text-white flex items-center gap-2">
@@ -296,8 +290,8 @@ export const RevenueDashboardScreen: React.FC = () => {
 
       {/* Log Income Modal */}
       {isLogIncomeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-md bg-[#0A0C14] border border-[#2E3552] rounded-3xl p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md bg-[#0A0C14] border border-[#2E3552] rounded-3xl p-6 shadow-2xl space-y-4 animate-scale-up">
             <div className="flex items-center justify-between border-b border-[#2E3552] pb-3">
               <h2 className="font-bold text-lg text-white">Log Income / Client Payment</h2>
               <button
@@ -347,8 +341,8 @@ export const RevenueDashboardScreen: React.FC = () => {
 
       {/* Edit Current Revenue Modal */}
       {isEditRevenueOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-md bg-[#0A0C14] border border-[#2E3552] rounded-3xl p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md bg-[#0A0C14] border border-[#2E3552] rounded-3xl p-6 shadow-2xl space-y-4 animate-scale-up">
             <div className="flex items-center justify-between border-b border-[#2E3552] pb-3">
               <h2 className="font-bold text-lg text-white flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-[#00E676]" /> Edit Current Monthly Revenue
@@ -395,8 +389,8 @@ export const RevenueDashboardScreen: React.FC = () => {
 
       {/* Edit Target Goal Modal */}
       {isEditGoalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-md bg-[#0A0C14] border border-[#2E3552] rounded-3xl p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md bg-[#0A0C14] border border-[#2E3552] rounded-3xl p-6 shadow-2xl space-y-4 animate-scale-up">
             <div className="flex items-center justify-between border-b border-[#2E3552] pb-3">
               <h2 className="font-bold text-lg text-white">Edit Monthly Revenue Goal</h2>
               <button
@@ -414,10 +408,12 @@ export const RevenueDashboardScreen: React.FC = () => {
                 </label>
                 <input
                   type="number"
+                  step="any"
+                  min="0"
                   required
                   value={newTargetGoal}
-                  onChange={(e) => setNewTargetGoal(Number(e.target.value))}
-                  className="w-full bg-[#131726] border border-[#2E3552] rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-[#7C3AED]"
+                  onChange={(e) => setNewTargetGoal(e.target.value)}
+                  className="w-full bg-[#131726] border border-[#2E3552] rounded-xl px-4 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:border-[#7C3AED]"
                 />
               </div>
 

@@ -352,9 +352,9 @@ export const TaskManagerScreen: React.FC = () => {
 
       {/* Add/Edit Task Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
           <div
-            className={`w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 border ${
+            className={`w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-4 border animate-scale-up ${
               isLight ? 'bg-white border-purple-300 text-slate-900' : 'bg-[#0A0C14] border-[#2E3552] text-white'
             }`}
           >

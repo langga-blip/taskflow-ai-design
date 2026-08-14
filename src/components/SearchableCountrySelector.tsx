@@ -69,7 +69,7 @@ export const SearchableCountrySelector: React.FC<SearchableCountrySelectorProps>
 
       {/* Modal / Search Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div
             className={`w-full max-w-md rounded-2xl border p-5 shadow-2xl flex flex-col max-h-[85vh] animate-scale-up ${
               isLightMode

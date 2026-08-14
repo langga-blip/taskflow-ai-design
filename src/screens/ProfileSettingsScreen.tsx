@@ -49,7 +49,7 @@ export const ProfileSettingsScreen: React.FC = () => {
     userProfile.currentMonthlyRevenue !== undefined ? userProfile.currentMonthlyRevenue : 0
   );
   const [monthlyRevenueGoal, setMonthlyRevenueGoal] = useState<string | number>(
-    userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 10000
+    userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 0
   );
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -59,7 +59,7 @@ export const ProfileSettingsScreen: React.FC = () => {
     const finalRev = isNaN(parsedRev) || parsedRev < 0 ? 0 : parsedRev;
 
     const parsedGoal = typeof monthlyRevenueGoal === 'string' ? parseFloat(monthlyRevenueGoal) : monthlyRevenueGoal;
-    const finalGoal = isNaN(parsedGoal) || parsedGoal <= 0 ? 10000 : parsedGoal;
+    const finalGoal = isNaN(parsedGoal) || parsedGoal < 0 ? 0 : parsedGoal;
 
     updateUserProfile({
       userName,
@@ -114,9 +114,19 @@ export const ProfileSettingsScreen: React.FC = () => {
 
           <div className="flex items-center gap-2">
             {userProfile.isSubscribed ? (
-              <span className="px-3 py-1.5 rounded-xl bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40 font-bold text-xs flex items-center gap-1.5">
-                <Crown className="w-4 h-4" /> Pro Annual Active
-              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentScreen('subscription')}
+                className="px-3 py-1.5 rounded-xl bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40 font-bold text-xs flex items-center gap-1.5 cursor-pointer hover:bg-[#F59E0B]/30 transition-all"
+                title="View Subscription & Days Countdown"
+              >
+                <Crown className="w-4 h-4" /> Pro {userProfile.subscriptionDuration ? {
+                  '1_MONTH': '1 Month',
+                  '3_MONTHS': '3 Months',
+                  '6_MONTHS': '6 Months',
+                  '1_YEAR': 'Annual'
+                }[userProfile.subscriptionDuration] || 'Active' : 'Active'}
+              </button>
             ) : (
               <button
                 type="button"

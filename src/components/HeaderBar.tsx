@@ -91,13 +91,29 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({ title, subtitle }) => {
                   TaskFlow
                 </span>
                 {userProfile.isSubscribed ? (
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold bg-[#F59E0B]/20 text-[#F59E0B] rounded-md border border-[#F59E0B]/40 flex items-center gap-0.5 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentScreen('subscription');
+                    }}
+                    className="px-1.5 py-0.5 text-[9px] font-bold bg-[#F59E0B]/20 text-[#F59E0B] rounded-md border border-[#F59E0B]/40 flex items-center gap-0.5 flex-shrink-0 cursor-pointer hover:bg-[#F59E0B]/30"
+                    title="View Active Subscription & Days Countdown"
+                  >
                     <Crown className="w-2.5 h-2.5" /> PRO
-                  </span>
+                  </button>
                 ) : (
-                  <span className="px-1.5 py-0.5 text-[9px] font-semibold bg-[#7C3AED]/20 text-[#7C3AED] dark:text-[#A78BFA] rounded-md border border-[#7C3AED]/30 flex-shrink-0">
-                    AI
-                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentScreen('subscription');
+                    }}
+                    className="px-1.5 py-0.5 text-[9px] font-bold bg-amber-500/20 text-amber-400 rounded-md border border-amber-500/40 flex items-center gap-0.5 flex-shrink-0 cursor-pointer animate-pulse"
+                    title="Activate Subscription"
+                  >
+                    <Crown className="w-2.5 h-2.5" /> UPGRADE
+                  </button>
                 )}
               </div>
               <p

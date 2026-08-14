@@ -62,7 +62,7 @@ interface AppContextType {
   formatRevenue: (amount: number, includeDecimals?: boolean) => string;
   getTimeOfDayGreeting: () => string;
   generateDailyPlan: () => Promise<Task[]>;
-  askAssistant: (prompt: string) => Promise<string>;
+  askAssistant: (prompt: string, imageData?: string) => Promise<string>;
   generateWeeklyReview: (completedTasks: string[], revenue: number) => Promise<Partial<WeeklyReview>>;
 }
 
@@ -388,9 +388,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return generatedTasks;
   };
 
-  const askAssistant = async (prompt: string): Promise<string> => {
+  const askAssistant = async (prompt: string, imageData?: string): Promise<string> => {
     const rate = exchangeRates[userProfile.currencyCode.toUpperCase()] || 1.0;
-    return await askAssistantApi(prompt, userProfile, rate, aiProvider);
+    return await askAssistantApi(prompt, userProfile, rate, aiProvider, imageData);
   };
 
   const generateWeeklyReview = async (

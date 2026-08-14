@@ -78,30 +78,46 @@ export const AuthScreen: React.FC = () => {
 
     const fullPhoneNumber = `${selectedCountry.dialCode} ${phoneDigits.trim()}`;
 
-    updateUserProfile({
-      userName: name || 'Alex Rivera',
-      userEmail: email,
-      gender,
-      country: selectedCountry.name,
-      currencyCode: selectedCountry.currencyCode,
-      currencySymbol: selectedCountry.currencySymbol,
-      timezoneId: selectedCountry.timezone,
-      phoneNumber: fullPhoneNumber,
-      isOnboarded: true,
-    });
-
     if (isRegister) {
+      updateUserProfile({
+        userName: name || 'Alex Rivera',
+        userEmail: email,
+        gender,
+        country: selectedCountry.name,
+        currencyCode: selectedCountry.currencyCode,
+        currencySymbol: selectedCountry.currencySymbol,
+        timezoneId: selectedCountry.timezone,
+        phoneNumber: fullPhoneNumber,
+        isOnboarded: false,
+      });
+
       triggerNotification(
         'Workspace Registered! 🎉',
-        `Welcome ${name}! Configured for ${selectedCountry.name} (${selectedCountry.currencyCode} ${selectedCountry.currencySymbol}).`,
+        `Welcome ${name}! Please complete your workspace profile to get started.`,
         'SYSTEM',
-        'dashboard'
+        'onboarding'
       );
+      setCurrentScreen('onboarding');
     } else {
-      triggerNotification('Welcome Back! 👋', `Signed in as ${email}`, 'SYSTEM', 'dashboard');
-    }
+      updateUserProfile({
+        userName: name || 'Alex Rivera',
+        userEmail: email,
+        gender,
+        country: selectedCountry.name,
+        currencyCode: selectedCountry.currencyCode,
+        currencySymbol: selectedCountry.currencySymbol,
+        timezoneId: selectedCountry.timezone,
+        phoneNumber: fullPhoneNumber,
+        isOnboarded: true,
+      });
 
-    setCurrentScreen('dashboard');
+      triggerNotification('Welcome Back! 👋', `Signed in as ${email}`, 'SYSTEM', userProfile.isSubscribed ? 'dashboard' : 'subscription');
+      if (userProfile.isSubscribed) {
+        setCurrentScreen('dashboard');
+      } else {
+        setCurrentScreen('subscription');
+      }
+    }
   };
 
   // Handle Google Auth
@@ -398,7 +414,7 @@ export const AuthScreen: React.FC = () => {
                 <div>
                   <label className="block text-xs font-semibold mb-1">New Password</label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type={showNewPassword ? 'text' : 'password'}
                       required
@@ -406,7 +422,7 @@ export const AuthScreen: React.FC = () => {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Enter new password"
-                      className={`w-full border rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                      className={`w-full border rounded-xl pl-10 pr-11 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                         isLight
                           ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                           : 'bg-[#0A0C14] border-[#2E3552] text-white'
@@ -414,13 +430,25 @@ export const AuthScreen: React.FC = () => {
                     />
                     <button
                       type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className={`absolute right-3.5 top-1/2 -translate-y-1/2 cursor-pointer p-0.5 ${
-                        isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowNewPassword((prev) => !prev);
+                      }}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors cursor-pointer z-10 flex items-center justify-center ${
+                        isLight
+                          ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                       }`}
                       title={showNewPassword ? 'Hide password' : 'Show password'}
+                      aria-label={showNewPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showNewPassword ? (
+                        <EyeOff className="w-4 h-4 text-[#06B6D4]" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -428,7 +456,7 @@ export const AuthScreen: React.FC = () => {
                 <div>
                   <label className="block text-xs font-semibold mb-1">Confirm New Password</label>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type={showConfirmPassword ? 'text' : 'password'}
                       required
@@ -436,7 +464,7 @@ export const AuthScreen: React.FC = () => {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirm new password"
-                      className={`w-full border rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                      className={`w-full border rounded-xl pl-10 pr-11 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
                         isLight
                           ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                           : 'bg-[#0A0C14] border-[#2E3552] text-white'
@@ -444,13 +472,25 @@ export const AuthScreen: React.FC = () => {
                     />
                     <button
                       type="button"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className={`absolute right-3.5 top-1/2 -translate-y-1/2 cursor-pointer p-0.5 ${
-                        isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowConfirmPassword((prev) => !prev);
+                      }}
+                      className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors cursor-pointer z-10 flex items-center justify-center ${
+                        isLight
+                          ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                       }`}
                       title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showConfirmPassword ? (
+                        <EyeOff className="w-4 h-4 text-[#06B6D4]" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -580,16 +620,11 @@ export const AuthScreen: React.FC = () => {
                   >
                     <div className="font-bold text-[#06B6D4] flex items-center justify-between">
                       <span className="flex items-center gap-1">
-                        <Sparkles className="w-3.5 h-3.5" /> Workspace Configuration & Password:
+                        <Sparkles className="w-3.5 h-3.5" /> Auto-Configured Localization
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="text-[10px] font-semibold text-[#06B6D4] hover:underline cursor-pointer flex items-center gap-0.5"
-                      >
-                        {showPassword ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                        <span>{showPassword ? 'Hide' : 'Show'}</span>
-                      </button>
+                      <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                        <ShieldCheck className="w-3 h-3" /> Ready
+                      </span>
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 text-[10px]">
                       <div>
@@ -602,11 +637,9 @@ export const AuthScreen: React.FC = () => {
                         Timezone:{' '}
                         <span className="font-semibold">{selectedCountry.timezone}</span>
                       </div>
-                      <div className="col-span-2 flex items-center gap-1 pt-0.5 border-t border-slate-700/30">
-                        <span className={isLight ? 'text-slate-600' : 'text-slate-400'}>Password:</span>{' '}
-                        <span className="font-mono font-bold text-[#7C3AED] dark:text-[#A78BFA]">
-                          {password ? (showPassword ? password : '••••••••••••') : 'Not set yet'}
-                        </span>
+                      <div className="col-span-2 text-slate-400">
+                        Dial Code:{' '}
+                        <span className="font-semibold text-white">{selectedCountry.dialCode}</span>
                       </div>
                     </div>
                   </div>
@@ -617,7 +650,7 @@ export const AuthScreen: React.FC = () => {
               <div>
                 <label className="block text-xs font-semibold mb-1">Work Email</label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="email"
                     required
@@ -633,7 +666,7 @@ export const AuthScreen: React.FC = () => {
                 </div>
               </div>
 
-              {/* Password Field */}
+              {/* Password Field with Fixed Revealer */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-semibold">Password</label>
@@ -648,14 +681,15 @@ export const AuthScreen: React.FC = () => {
                   )}
                 </div>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    className={`w-full border rounded-xl pl-10 pr-10 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] ${
+                    placeholder="Enter your password"
+                    autoComplete={isRegister ? 'new-password' : 'current-password'}
+                    className={`w-full border rounded-xl pl-10 pr-11 py-2.5 text-sm focus:outline-none focus:border-[#7C3AED] transition-colors ${
                       isLight
                         ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 shadow-sm'
                         : 'bg-[#0A0C14] border-[#2E3552] text-white'
@@ -663,13 +697,25 @@ export const AuthScreen: React.FC = () => {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className={`absolute right-3.5 top-1/2 -translate-y-1/2 cursor-pointer p-0.5 ${
-                      isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-slate-200'
+                    tabIndex={-1}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowPassword((prev) => !prev);
+                    }}
+                    className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg transition-colors cursor-pointer z-10 flex items-center justify-center ${
+                      isLight
+                        ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                     }`}
                     title={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4 text-[#06B6D4]" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
               </div>

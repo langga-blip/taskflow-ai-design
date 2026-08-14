@@ -90,7 +90,8 @@ export async function askAssistantApi(
   prompt: string,
   profile: UserProfile,
   usdToTargetRate: number = 1.0,
-  provider: AiProvider = 'GEMINI'
+  provider: AiProvider = 'GEMINI',
+  imageData?: string
 ): Promise<string> {
   try {
     const res = await fetch('/api/ai/chat', {
@@ -101,6 +102,7 @@ export async function askAssistantApi(
         profile,
         usdToTargetRate,
         provider,
+        imageData,
       }),
     });
     const data = await res.json();
