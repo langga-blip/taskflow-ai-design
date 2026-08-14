@@ -27,16 +27,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Grant execute permission
-  run: chmod +x gradlew
+        run: chmod +x gradlew
 
-- name: Create google-services.json
-  env:
-    GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-  run: |
-    printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
-
-- name: Build Debug APK
-  run: ./gradlew assembleDebug
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
