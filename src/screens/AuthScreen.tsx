@@ -114,7 +114,7 @@ export const AuthScreen: React.FC = () => {
       const cleanEmail = email.trim().toLowerCase();
 
       // Check if email already registered
-      if (isEmailRegistered(cleanEmail, userProfile.userEmail)) {
+      if (isEmailRegistered(cleanEmail)) {
         setIsDuplicateEmailError(true);
         setDuplicateErrorMsg(`Account for ${cleanEmail} already exists. Redirecting you to Sign In...`);
         setShowRedirectToast(true);
@@ -135,7 +135,7 @@ export const AuthScreen: React.FC = () => {
       }
 
       // Check if phone number already registered
-      if (isPhoneRegistered(fullPhoneNumber, userProfile.phoneNumber) || isPhoneRegistered(phoneDigits, userProfile.phoneNumber)) {
+      if (isPhoneRegistered(fullPhoneNumber)) {
         setIsDuplicateEmailError(true);
         setDuplicateErrorMsg(`Phone number ${fullPhoneNumber} is already registered. Redirecting you to Sign In...`);
         setShowRedirectToast(true);

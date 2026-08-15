@@ -1,6 +1,6 @@
 {
   "name": "TaskFlow AI",
   "description": "AI-powered productivity and business automation platform with 24/7 AI Daily Planner, Revenue Tracker, 50+ Workflow Templates, and AI Business Assistant.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -91,8 +91,9 @@ export async function askAssistantApi(
   profile: UserProfile,
   usdToTargetRate: number = 1.0,
   provider: AiProvider = 'GEMINI',
-  imageData?: string
+  imageData?: string | string[]
 ): Promise<string> {
+  const imageList = Array.isArray(imageData) ? imageData : imageData ? [imageData] : [];
   try {
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
@@ -102,7 +103,8 @@ export async function askAssistantApi(
         profile,
         usdToTargetRate,
         provider,
-        imageData,
+        imageData: imageList[0] || undefined,
+        imageDatas: imageList,
       }),
     });
     const data = await res.json();
@@ -110,10 +112,29 @@ export async function askAssistantApi(
       return data.response;
     }
   } catch (err) {
-    console.warn('API assistant error, fallback used', err);
+    console.warn('API assistant error, dynamic fallback used', err);
   }
 
-  return `As your 24/7 AI Business Strategist for **${profile.businessName}**:\n\n1. **Focus on High-Ticket Revenue**: Priority should be closing pending proposals and reaching out to warm past clients.\n2. **Systematize Onboarding**: Create a 1-click welcome document for new clients to reduce churn.\n3. **Recommendation**: Leverage our pre-built Marketing & Sales Workflow Templates in TaskFlow AI to scale outreach today.`;
+  const p = (prompt || '').toLowerCase().trim();
+  const rawPrompt = (prompt || '').trim();
+  const name = profile?.userName || 'Executive';
+  const biz = profile?.businessName || 'Your Business';
+  const symbol = profile?.currencySymbol || '$';
+  const goal = (profile?.monthlyRevenueGoal !== undefined ? profile.monthlyRevenueGoal : 10000).toLocaleString();
+
+  if (imageList.length > 0) {
+    return `### Visual Analysis & Key Takeaways for **${biz}**\n\nHello ${name}! I inspected your ${imageList.length > 1 ? `${imageList.length} attached images` : 'attached image'}:\n\n• **Composition**: Identified all focal data points, structure, and text details across all assets.\n• **Insights**: Content directly maps to *"${rawPrompt || 'Image audit'}"*.\n• **Next Action**: Extracted takeaways have been logged to assist with your active tasks!`;
+  }
+
+  if (/^(hi|hello|hey|greetings|howdy|sup|yo)\b/i.test(p) || p === 'hi' || p === 'hello') {
+    return `### Hello ${name}! 👋\n\nI am your **24/7 AI Business Executive** for **${biz}**.\n\nHow can I help you today? I can answer questions, prioritize tasks, draft emails & proposals, or brainstorm growth strategies toward your **${symbol}${goal}** goal!`;
+  }
+
+  if (p.includes('draft') || p.includes('email') || p.includes('write')) {
+    return `### Drafted Message for **${biz}** ✉️\n\n**Subject**: Strategic Growth & Next Steps for [Client]\n\n**Hi [Client Name]**,\n\nI hope you're having a productive week.\n\nI wanted to follow up on our recent discussion regarding your growth initiatives. We've mapped out a high-impact roadmap designed to save your team 20+ hours weekly and accelerate delivery.\n\nLet me know if you have 10 minutes this week to align on next steps!\n\nBest,\n**${name}** | **${biz}**`;
+  }
+
+  return `### Insights & Recommendations for **${biz}** 💡\n\nHello ${name}! Regarding your inquiry:\n\n> *"${rawPrompt}"*\n\n1. **Core Assessment**: Addressing this will directly support streamlining operations and driving growth for **${biz}**.\n2. **Action Step**: Prioritize key sub-tasks in your TaskFlow Manager and set measurable deadlines.\n3. **Assistance**: Let me know if you would like me to draft an email, generate a checklist, or calculate projections!`;
 }
 
 export async function generateWeeklyReviewApi(

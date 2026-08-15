@@ -92,10 +92,15 @@ export const SubscriptionScreen: React.FC = () => {
   const { userProfile, updateUserProfile, setCurrentScreen, triggerNotification, exchangeRates } = useApp();
   const isLight = userProfile.themeMode === 'Light';
 
-  // For new / unregistered users: NO plan is active or highlighted until they click one
-  const [selectedDuration, setSelectedDuration] = useState<DurationKey | null>(
-    userProfile.isSubscribed ? (userProfile.subscriptionDuration || '3_MONTHS') : null
+  // True active subscription check (must be subscribed AND have valid future expiry)
+  const isUserSubscribed = Boolean(
+    userProfile.isSubscribed &&
+    userProfile.subscriptionExpiryMs &&
+    userProfile.subscriptionExpiryMs > Date.now()
   );
+
+  // For unsubscribed / registering users: strictly NO plan is pre-selected or highlighted
+  const [selectedDuration, setSelectedDuration] = useState<DurationKey | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [receiptSent, setReceiptSent] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<'account' | 'bank' | 'name' | null>(null);
@@ -119,20 +124,8 @@ export const SubscriptionScreen: React.FC = () => {
   // Calculate live countdown timer
   useEffect(() => {
     const updateCountdown = () => {
-      if (!userProfile.isSubscribed || !userProfile.subscriptionExpiryMs) {
-        if (selectedDuration) {
-          const plan = PLAN_OPTIONS.find((p) => p.key === selectedDuration);
-          const days = plan ? plan.days : 0;
-          setTimeLeft({
-            days,
-            hours: 0,
-            minutes: 0,
-            seconds: 0,
-            totalSeconds: days * 86400,
-          });
-        } else {
-          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, totalSeconds: 0 });
-        }
+      if (!isUserSubscribed || !userProfile.subscriptionExpiryMs) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, totalSeconds: 0 });
         return;
       }
 
@@ -140,7 +133,7 @@ export const SubscriptionScreen: React.FC = () => {
       if (diffMs <= 0) {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, totalSeconds: 0 });
         if (userProfile.isSubscribed) {
-          updateUserProfile({ isSubscribed: false });
+          updateUserProfile({ isSubscribed: false, subscriptionExpiryMs: 0 });
         }
         return;
       }
@@ -157,13 +150,13 @@ export const SubscriptionScreen: React.FC = () => {
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
     return () => clearInterval(interval);
-  }, [userProfile.isSubscribed, userProfile.subscriptionExpiryMs, selectedDuration]);
+  }, [isUserSubscribed, userProfile.subscriptionExpiryMs]);
 
   // Active plan details (what user actually paid for)
   const activePlanKey = (userProfile.subscriptionDuration || '3_MONTHS') as DurationKey;
   const activePlan = PLAN_OPTIONS.find((p) => p.key === activePlanKey) || PLAN_OPTIONS[1];
 
-  // Selected plan details for payment/preview (null if user hasn't selected a duration yet)
+  // Selected plan details for payment/preview (null if user hasn't clicked a duration yet)
   const currentPlan = selectedDuration ? PLAN_OPTIONS.find((p) => p.key === selectedDuration) || null : null;
 
   // Helper to format price in user's selected country currency based on real exchange rates
@@ -192,12 +185,14 @@ export const SubscriptionScreen: React.FC = () => {
   };
 
   const handlePlanCardClick = (plan: PlanOption) => {
+    setSelectedDuration(plan.key);
     // If the user already has an active subscription and clicks a different plan
-    if (userProfile.isSubscribed && plan.key !== activePlanKey) {
+    if (isUserSubscribed && plan.key !== activePlanKey) {
       setPendingPlan(plan);
       setShowSwitchPlanModal(true);
     } else {
-      setSelectedDuration(plan.key);
+      // Pop-up modal appears immediately upon clicking any plan!
+      setShowPaymentModal(true);
     }
   };
 
@@ -301,26 +296,49 @@ export const SubscriptionScreen: React.FC = () => {
 
   return (
     <div className="space-y-7 pt-2 pb-32 px-3 sm:px-6 max-w-4xl mx-auto animate-fade-in overflow-x-hidden">
-      {/* Top back navigation button */}
-      <div className="flex items-center justify-between pb-1">
-        <button
-          type="button"
-          onClick={() => setCurrentScreen(userProfile.isOnboarded ? 'dashboard' : 'auth')}
-          className={`py-2 px-3.5 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${
-            isLight
-              ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
-              : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white hover:border-slate-500'
-          }`}
-        >
-          <ArrowLeft className="w-4 h-4 text-[#06B6D4]" />
-          <span>Back to {userProfile.isOnboarded ? 'Workspace' : 'Sign In'}</span>
-        </button>
-        
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] font-bold text-amber-400">
-          <Lock className="w-3 h-3" />
-          <span>Secure Access Gateway</span>
+      {/* Top navigation bar: "Back to Workspace" for verified subscribers, "Back to Profile & Setup" for new users */}
+      {isUserSubscribed && userProfile.isOnboarded ? (
+        <div className="flex items-center justify-between pb-1">
+          <button
+            type="button"
+            onClick={() => setCurrentScreen('dashboard')}
+            className={`py-2 px-3.5 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${
+              isLight
+                ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
+                : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white hover:border-slate-500'
+            }`}
+          >
+            <ArrowLeft className="w-4 h-4 text-[#06B6D4]" />
+            <span>Back to Workspace</span>
+          </button>
+          
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-bold text-emerald-400">
+            <ShieldCheck className="w-3 h-3" />
+            <span>Active Member</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between pb-1">
+          <button
+            type="button"
+            onClick={() => setCurrentScreen('onboarding')}
+            className={`py-2 px-3.5 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${
+              isLight
+                ? 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-sm'
+                : 'bg-[#131726] border-[#2E3552] text-slate-300 hover:text-white hover:border-slate-500'
+            }`}
+            title="Return to Profile, Country and Goals Setup"
+          >
+            <ArrowLeft className="w-4 h-4 text-[#06B6D4]" />
+            <span>Back to Profile, Country & Goals</span>
+          </button>
+
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] font-bold text-amber-400 shadow-sm">
+            <Lock className="w-3 h-3" />
+            <span>Step 3 of 3 • Gateway</span>
+          </div>
+        </div>
+      )}
 
       {/* Header Badge & Title */}
       <div className="text-center space-y-3 pb-2">
@@ -340,7 +358,7 @@ export const SubscriptionScreen: React.FC = () => {
       </div>
 
       {/* Access Gate Warning Banner if not subscribed */}
-      {!userProfile.isSubscribed && (
+      {!isUserSubscribed && (
         <div
           className={`p-4 rounded-3xl border flex items-center gap-3.5 shadow-sm my-2 ${
             isLight
@@ -360,20 +378,15 @@ export const SubscriptionScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Live Countdown & Status Box (Visible when Subscribed or Plan Selected) */}
-      <GlassCard
-        className={`p-6 sm:p-8 rounded-3xl border transition-all my-3 ${
-          userProfile.isSubscribed
-            ? isLight
+      {/* Live Countdown & Status Box: Only shown if user is ALREADY an active subscriber */}
+      {isUserSubscribed && (
+        <GlassCard
+          className={`p-6 sm:p-8 rounded-3xl border transition-all my-3 ${
+            isLight
               ? 'bg-emerald-50/90 border-emerald-300 shadow-md ring-1 ring-emerald-400/30'
               : 'bg-emerald-950/35 border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.18)]'
-            : isLight
-            ? 'bg-slate-50/90 border-purple-200 shadow-sm'
-            : 'bg-[#131726]/90 border-[#2E3552]'
-        }`}
-      >
-        {userProfile.isSubscribed ? (
-          /* Active Subscription Status Box (Bigger, Spacious & Neat) */
+          }`}
+        >
           <div className="space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-purple-500/20">
               <div className="flex items-center gap-3">
@@ -389,19 +402,19 @@ export const SubscriptionScreen: React.FC = () => {
                       Executive Workspace Pass
                     </span>
                   </div>
-                  <h3 className="text-lg sm:text-xl font-black mt-0.5 flex items-center gap-2 text-white">
+                  <h3 className={`text-lg sm:text-xl font-black mt-0.5 flex items-center gap-2 ${isLight ? 'text-slate-950' : 'text-white'}`}>
                     TaskFlow AI Pro • {activePlan.label} Pass
                   </h3>
                 </div>
               </div>
 
               <div className={`px-4 py-2 rounded-2xl border text-xs flex items-center gap-2 self-start sm:self-auto ${
-                isLight ? 'bg-white border-emerald-200 text-slate-800' : 'bg-[#0A0C14] border-emerald-500/30 text-emerald-300'
+                isLight ? 'bg-white border-emerald-300 text-slate-900 shadow-sm' : 'bg-[#0A0C14] border-emerald-500/30 text-emerald-300'
               }`}>
-                <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
+                <Clock className="w-4 h-4 text-emerald-500 shrink-0" />
                 <div>
-                  <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Expires On:</span>
-                  <span className="font-mono font-extrabold text-sm text-white">
+                  <span className={`text-[10px] uppercase tracking-wider block font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Expires On:</span>
+                  <span className={`font-mono font-black text-sm ${isLight ? 'text-emerald-700' : 'text-white'}`}>
                     {userProfile.subscriptionExpiryDate || 'Active Subscription'}
                   </span>
                 </div>
@@ -411,132 +424,64 @@ export const SubscriptionScreen: React.FC = () => {
             {/* Live Digital Countdown Timer */}
             <div className="space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2 px-1">
-                <span className="text-xs sm:text-sm font-bold text-slate-300 flex items-center gap-1.5">
-                  <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                <span className={`text-xs sm:text-sm font-black flex items-center gap-1.5 ${isLight ? 'text-slate-900' : 'text-slate-300'}`}>
+                  <Zap className="w-4 h-4 text-amber-500 shrink-0" />
                   <span>Real-Time Subscription Expiry Countdown:</span>
                 </span>
-                <span className="text-xs sm:text-sm font-black text-[#06B6D4] font-mono">
+                <span className={`text-xs sm:text-sm font-black font-mono ${isLight ? 'text-cyan-700' : 'text-[#06B6D4]'}`}>
                   {timeLeft.days} Days Remaining
                 </span>
               </div>
 
               <div className="grid grid-cols-4 gap-2.5 sm:gap-4 text-center">
-                <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col items-center justify-center ${isLight ? 'bg-white border-purple-200 shadow-sm' : 'bg-[#0A0C14] border-[#2E3552]'}`}>
-                  <div className="text-2xl sm:text-3xl font-black text-amber-400 font-mono">
+                <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col items-center justify-center ${isLight ? 'bg-white border-amber-300 shadow-sm' : 'bg-[#0A0C14] border-[#2E3552]'}`}>
+                  <div className={`text-2xl sm:text-3xl font-black font-mono ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>
                     {String(timeLeft.days).padStart(2, '0')}
                   </div>
-                  <div className="text-[10px] sm:text-xs uppercase tracking-wider text-slate-400 font-bold mt-1">DAYS</div>
+                  <div className={`text-[10px] sm:text-xs uppercase tracking-wider font-extrabold mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>DAYS</div>
                 </div>
 
-                <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col items-center justify-center ${isLight ? 'bg-white border-purple-200 shadow-sm' : 'bg-[#0A0C14] border-[#2E3552]'}`}>
-                  <div className="text-2xl sm:text-3xl font-black text-[#06B6D4] font-mono">
+                <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col items-center justify-center ${isLight ? 'bg-white border-cyan-300 shadow-sm' : 'bg-[#0A0C14] border-[#2E3552]'}`}>
+                  <div className={`text-2xl sm:text-3xl font-black font-mono ${isLight ? 'text-cyan-600' : 'text-[#06B6D4]'}`}>
                     {String(timeLeft.hours).padStart(2, '0')}
                   </div>
-                  <div className="text-[10px] sm:text-xs uppercase tracking-wider text-slate-400 font-bold mt-1">HOURS</div>
+                  <div className={`text-[10px] sm:text-xs uppercase tracking-wider font-extrabold mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>HOURS</div>
                 </div>
 
-                <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col items-center justify-center ${isLight ? 'bg-white border-purple-200 shadow-sm' : 'bg-[#0A0C14] border-[#2E3552]'}`}>
-                  <div className="text-2xl sm:text-3xl font-black text-[#A78BFA] font-mono">
+                <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col items-center justify-center ${isLight ? 'bg-white border-purple-300 shadow-sm' : 'bg-[#0A0C14] border-[#2E3552]'}`}>
+                  <div className={`text-2xl sm:text-3xl font-black font-mono ${isLight ? 'text-purple-600' : 'text-[#A78BFA]'}`}>
                     {String(timeLeft.minutes).padStart(2, '0')}
                   </div>
-                  <div className="text-[10px] sm:text-xs uppercase tracking-wider text-slate-400 font-bold mt-1">MINUTES</div>
+                  <div className={`text-[10px] sm:text-xs uppercase tracking-wider font-extrabold mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>MINUTES</div>
                 </div>
 
-                <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col items-center justify-center ${isLight ? 'bg-white border-purple-200 shadow-sm' : 'bg-[#0A0C14] border-[#2E3552]'}`}>
-                  <div className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">
+                <div className={`p-3 sm:p-4 rounded-2xl border flex flex-col items-center justify-center ${isLight ? 'bg-white border-emerald-300 shadow-sm' : 'bg-[#0A0C14] border-[#2E3552]'}`}>
+                  <div className={`text-2xl sm:text-3xl font-black font-mono ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>
                     {String(timeLeft.seconds).padStart(2, '0')}
                   </div>
-                  <div className="text-[10px] sm:text-xs uppercase tracking-wider text-slate-400 font-bold mt-1">SECONDS</div>
+                  <div className={`text-[10px] sm:text-xs uppercase tracking-wider font-extrabold mt-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>SECONDS</div>
                 </div>
               </div>
             </div>
           </div>
-        ) : currentPlan ? (
-          /* Selected Plan Duration Preview */
-          <div className="space-y-4">
-            <div className="flex items-start gap-3 pb-3 border-b border-purple-500/20">
-              <div className="w-11 h-11 rounded-2xl bg-[#7C3AED]/20 text-[#06B6D4] border border-[#7C3AED]/40 flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
-                <Clock className="w-5 h-5" />
-              </div>
-
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <span className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block">
-                  SELECTED PLAN DURATION
-                </span>
-                <h3 className="text-base sm:text-lg font-black text-white">
-                  {currentPlan.label} Pass ({currentPlan.days} Days Access)
-                </h3>
-                <div className="pt-1 flex items-center gap-2 text-xs">
-                  <span className="text-slate-400 font-medium">Estimated Expiration Date:</span>
-                  <span className="font-mono font-bold text-[#06B6D4]">
-                    {new Date(Date.now() + currentPlan.days * 86400000).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-slate-300 font-semibold px-1">
-                <span>Included Access Duration:</span>
-                <span className="text-[#06B6D4] font-bold font-mono">{currentPlan.days} Days ({currentPlan.label})</span>
-              </div>
-              <div className="grid grid-cols-4 gap-2 sm:gap-3 text-center">
-                <div className="p-2.5 sm:p-3 rounded-2xl border bg-[#0A0C14] border-[#2E3552]">
-                  <div className="text-xl sm:text-2xl font-black text-amber-400 font-mono">{String(currentPlan.days).padStart(2, '0')}</div>
-                  <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mt-1">DAYS</div>
-                </div>
-                <div className="p-2.5 sm:p-3 rounded-2xl border bg-[#0A0C14] border-[#2E3552]">
-                  <div className="text-xl sm:text-2xl font-black text-[#06B6D4] font-mono">00</div>
-                  <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mt-1">HOURS</div>
-                </div>
-                <div className="p-2.5 sm:p-3 rounded-2xl border bg-[#0A0C14] border-[#2E3552]">
-                  <div className="text-xl sm:text-2xl font-black text-[#A78BFA] font-mono">00</div>
-                  <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mt-1">MINUTES</div>
-                </div>
-                <div className="p-2.5 sm:p-3 rounded-2xl border bg-[#0A0C14] border-[#2E3552]">
-                  <div className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">00</div>
-                  <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold mt-1">SECONDS</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          /* Unselected State for Registering Users (No plan highlighted yet) */
-          <div className="text-center py-4 space-y-2">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#7C3AED] to-[#06B6D4] p-0.5 mx-auto shadow-md">
-              <div className="w-full h-full rounded-[14px] bg-[#0A0C14] flex items-center justify-center">
-                <Crown className="w-6 h-6 text-[#F59E0B]" />
-              </div>
-            </div>
-            <h3 className="text-base sm:text-lg font-black text-white">
-              Choose a Subscription Plan to Activate Pro
-            </h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-              No plan is active yet. Please click on your preferred duration below to view payment details and unlock instant workspace access.
-            </p>
-          </div>
-        )}
-      </GlassCard>
+        </GlassCard>
+      )}
 
       {/* Plan Duration Selector (1 Month, 3 Months, 6 Months, 1 Year) */}
-      <div className="space-y-3.5 my-4">
+      <div className="space-y-4 my-5">
         <div className="flex items-center justify-between flex-wrap gap-2 px-1">
-          <label className={`text-xs sm:text-sm font-extrabold uppercase tracking-wider ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
-            {userProfile.isSubscribed ? 'Subscription Plans (Select to Switch or Extend):' : 'Select Subscription Duration:'}
+          <label className={`text-xs sm:text-sm font-extrabold uppercase tracking-wider ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>
+            {isUserSubscribed ? 'Available Subscription Plans (Select to Switch or Extend):' : 'Select Subscription Duration:'}
           </label>
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
             <Globe className="w-3.5 h-3.5 text-[#06B6D4]" />
-            <span>Currency: <strong className={isLight ? 'text-slate-900' : 'text-white'}>{userProfile.country} ({userProfile.currencyCode} {userProfile.currencySymbol})</strong></span>
+            <span>Currency: <strong className={isLight ? 'text-slate-950 font-black' : 'text-white'}>{userProfile.country} ({userProfile.currencyCode} {userProfile.currencySymbol})</strong></span>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           {PLAN_OPTIONS.map((plan) => {
-            const isCurrentActivePlan = userProfile.isSubscribed && plan.key === activePlanKey;
+            const isCurrentActivePlan = isUserSubscribed && plan.key === activePlanKey;
             const isSelected = selectedDuration === plan.key;
             const localizedPrice = formatPrice(plan.baseNgn);
             const localizedMonthly = formatPrice(plan.monthlyEquivalentNgn);
@@ -548,15 +493,15 @@ export const SubscriptionScreen: React.FC = () => {
                 className={`relative p-5 rounded-3xl border transition-all cursor-pointer select-none ${
                   isCurrentActivePlan
                     ? isLight
-                      ? 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-500 shadow-md ring-2 ring-emerald-400/40'
-                      : 'bg-gradient-to-br from-[#122B22] to-[#0D1D18] border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.25)] ring-1 ring-emerald-400'
+                      ? 'bg-gradient-to-br from-emerald-50 to-emerald-100/70 border-emerald-500 shadow-md ring-2 ring-emerald-400/40 text-slate-900'
+                      : 'bg-gradient-to-br from-[#122B22] to-[#0D1D18] border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.25)] ring-1 ring-emerald-400 text-white'
                     : isSelected
                     ? isLight
-                      ? 'bg-gradient-to-br from-purple-50 to-amber-50 border-purple-600 shadow-md ring-2 ring-purple-400/40'
-                      : 'bg-gradient-to-br from-[#1E2338] to-[#131726] border-[#F59E0B] shadow-[0_0_20px_rgba(245,158,11,0.2)] ring-1 ring-[#F59E0B]'
+                      ? 'bg-gradient-to-br from-purple-50 to-amber-50/80 border-purple-600 shadow-md ring-2 ring-purple-400/40 text-slate-900'
+                      : 'bg-gradient-to-br from-[#1E2338] to-[#131726] border-[#F59E0B] shadow-[0_0_20px_rgba(245,158,11,0.2)] ring-1 ring-[#F59E0B] text-white'
                     : isLight
-                    ? 'bg-white border-slate-200 hover:border-purple-300 shadow-sm'
-                    : 'bg-[#131726]/70 border-[#2E3552] hover:border-slate-500'
+                    ? 'bg-white border-slate-300 hover:border-purple-400 shadow-sm text-slate-900 hover:shadow-md'
+                    : 'bg-[#131726]/70 border-[#2E3552] hover:border-slate-500 text-white'
                 }`}
               >
                 {/* Badges: Active Plan takes priority, otherwise marketing badge */}
@@ -577,21 +522,21 @@ export const SubscriptionScreen: React.FC = () => {
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-extrabold text-slate-400 block uppercase tracking-wider">
+                      <span className={`text-xs font-black block uppercase tracking-wider ${isLight ? 'text-purple-900' : 'text-slate-400'}`}>
                         {plan.label} ({plan.days} Days)
                       </span>
                       {isCurrentActivePlan && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-600 border border-emerald-500/30">
                           Current
                         </span>
                       )}
                     </div>
                     <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className={`text-xl sm:text-2xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                      <span className={`text-xl sm:text-2xl font-black ${isLight ? 'text-slate-950' : 'text-white'}`}>
                         {localizedPrice}
                       </span>
                       {userProfile.currencyCode !== 'NGN' && (
-                        <span className="text-[11px] text-slate-400 font-mono">
+                        <span className={`text-[11px] font-mono ${isLight ? 'text-slate-600 font-semibold' : 'text-slate-400'}`}>
                           (₦{plan.baseNgn.toLocaleString()})
                         </span>
                       )}
@@ -604,6 +549,8 @@ export const SubscriptionScreen: React.FC = () => {
                         ? 'bg-emerald-500 border-emerald-500 text-white'
                         : isSelected
                         ? 'bg-[#F59E0B] border-[#F59E0B] text-black'
+                        : isLight
+                        ? 'border-slate-400 bg-slate-100'
                         : 'border-slate-500'
                     }`}
                   >
@@ -611,13 +558,13 @@ export const SubscriptionScreen: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-purple-500/20 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">
+                <div className={`mt-4 pt-3 border-t flex items-center justify-between text-[11px] ${isLight ? 'border-slate-200' : 'border-purple-500/20'}`}>
+                  <span className={isLight ? 'text-slate-600 font-medium' : 'text-slate-400'}>
                     {isCurrentActivePlan
                       ? `Expires: ${userProfile.subscriptionExpiryDate || 'Active'}`
                       : plan.discountNote}
                   </span>
-                  <span className="font-bold text-[#06B6D4]">~{localizedMonthly}/mo</span>
+                  <span className={`font-black ${isLight ? 'text-cyan-700' : 'text-[#06B6D4]'}`}>~{localizedMonthly}/mo</span>
                 </div>
               </div>
             );
@@ -666,50 +613,54 @@ export const SubscriptionScreen: React.FC = () => {
         </p>
 
         {/* Account Details Box with generous internal margins and divider line padding */}
-        <div className={`p-5 rounded-2xl border space-y-3.5 my-2 ${isLight ? 'bg-white border-amber-200 shadow-sm' : 'bg-[#0A0C14] border-[#2E3552]'}`}>
+        <div className={`p-5 rounded-2xl border space-y-3.5 my-2 ${isLight ? 'bg-white border-amber-300 shadow-sm' : 'bg-[#0A0C14] border-[#2E3552]'}`}>
           {/* Bank Name */}
           <div className="flex items-center justify-between gap-2">
             <div>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Bank Name:</span>
-              <span className={`text-sm font-extrabold ${isLight ? 'text-purple-900' : 'text-white'}`}>Momo PSB</span>
+              <span className={`text-[10px] uppercase tracking-wider block font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Bank Name:</span>
+              <span className={`text-base font-black ${isLight ? 'text-purple-950' : 'text-white'}`}>Momo PSB</span>
             </div>
             <button
               onClick={() => copyToClipboard('Momo PSB', 'bank')}
-              className="px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs font-semibold flex items-center gap-1 border border-purple-500/30 cursor-pointer"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border cursor-pointer transition-colors ${
+                isLight ? 'bg-purple-100 text-purple-900 border-purple-300 hover:bg-purple-200' : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border-purple-500/30'
+              }`}
             >
-              {copiedField === 'bank' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+              {copiedField === 'bank' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               {copiedField === 'bank' ? 'Copied' : 'Copy'}
             </button>
           </div>
 
           {/* Account Number */}
-          <div className="flex items-center justify-between gap-2 pt-3.5 pb-1 border-t border-slate-700/40">
+          <div className={`flex items-center justify-between gap-2 pt-3.5 pb-1 border-t ${isLight ? 'border-slate-200' : 'border-slate-700/40'}`}>
             <div>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Account Number:</span>
-              <span className="text-lg sm:text-xl font-extrabold text-[#06B6D4] font-mono tracking-wider">
+              <span className={`text-[10px] uppercase tracking-wider block font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Account Number:</span>
+              <span className={`text-xl sm:text-2xl font-black font-mono tracking-wider ${isLight ? 'text-cyan-700' : 'text-[#06B6D4]'}`}>
                 8038977104
               </span>
             </div>
             <button
               onClick={() => copyToClipboard('8038977104', 'account')}
-              className="px-3 py-1.5 rounded-xl bg-[#06B6D4]/20 hover:bg-[#06B6D4]/30 text-[#06B6D4] text-xs font-bold flex items-center gap-1.5 border border-[#06B6D4]/40 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-[#06B6D4]/20 hover:bg-[#06B6D4]/30 text-[#06B6D4] text-xs font-black flex items-center gap-1.5 border border-[#06B6D4]/40 cursor-pointer shadow-sm"
             >
-              {copiedField === 'account' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedField === 'account' ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
               {copiedField === 'account' ? 'Copied Account!' : 'Copy Account'}
             </button>
           </div>
 
           {/* Account Name */}
-          <div className="flex items-center justify-between gap-2 pt-3.5 pb-1 border-t border-slate-700/40">
+          <div className={`flex items-center justify-between gap-2 pt-3.5 pb-1 border-t ${isLight ? 'border-slate-200' : 'border-slate-700/40'}`}>
             <div>
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Account Name:</span>
-              <span className={`text-sm font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>Stephen Owota</span>
+              <span className={`text-[10px] uppercase tracking-wider block font-bold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Account Name:</span>
+              <span className={`text-base font-black ${isLight ? 'text-slate-950' : 'text-slate-200'}`}>Stephen Owota</span>
             </div>
             <button
               onClick={() => copyToClipboard('Stephen Owota', 'name')}
-              className="px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 text-xs font-semibold flex items-center gap-1 border border-purple-500/30 cursor-pointer"
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border cursor-pointer transition-colors ${
+                isLight ? 'bg-purple-100 text-purple-900 border-purple-300 hover:bg-purple-200' : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border-purple-500/30'
+              }`}
             >
-              {copiedField === 'name' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+              {copiedField === 'name' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
               {copiedField === 'name' ? 'Copied' : 'Copy'}
             </button>
           </div>
@@ -718,12 +669,14 @@ export const SubscriptionScreen: React.FC = () => {
         {/* Verification / Activation Form Trigger */}
         <div className="pt-3">
           {receiptSent ? (
-            <div className="p-4 bg-emerald-500/10 border border-emerald-500/40 rounded-2xl text-center space-y-1">
-              <div className="text-emerald-500 font-extrabold text-sm flex items-center justify-center gap-1.5">
+            <div className={`p-4 rounded-2xl text-center space-y-1 border ${
+              isLight ? 'bg-emerald-50 border-emerald-300 text-slate-900' : 'bg-emerald-500/10 border-emerald-500/40 text-slate-200'
+            }`}>
+              <div className="text-emerald-600 font-black text-sm flex items-center justify-center gap-1.5">
                 <Check className="w-4 h-4" /> Payment Activated Successfully!
               </div>
-              <p className="text-xs text-slate-300">
-                Receipt dispatched to <span className="text-white font-semibold">{userProfile.userEmail || 'mummom692@gmail.com'}</span> (Txn: {receiptSent})
+              <p className={`text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                Receipt dispatched to <span className={`font-bold ${isLight ? 'text-slate-950' : 'text-white'}`}>{userProfile.userEmail || 'mummom692@gmail.com'}</span> (Txn: {receiptSent})
               </p>
             </div>
           ) : (
@@ -740,6 +693,8 @@ export const SubscriptionScreen: React.FC = () => {
                 className={`w-full py-3.5 px-6 rounded-2xl font-extrabold text-sm shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2 ${
                   currentPlan
                     ? 'bg-gradient-to-r from-[#F59E0B] via-[#D97706] to-[#7C3AED] text-white hover:scale-[1.01] active:scale-[0.99]'
+                    : isLight
+                    ? 'bg-slate-200 text-slate-500 border border-slate-300 hover:border-slate-400'
                     : 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-500'
                 }`}
               >
@@ -761,7 +716,7 @@ export const SubscriptionScreen: React.FC = () => {
                 )}
               </button>
 
-              <p className="text-[11px] text-center text-slate-400 italic">
+              <p className={`text-[11px] text-center italic ${isLight ? 'text-slate-600 font-medium' : 'text-slate-400'}`}>
                 Transfers to Momo PSB (Stephen Owota - 8038977104) are verified instantly.
               </p>
             </div>
@@ -770,15 +725,15 @@ export const SubscriptionScreen: React.FC = () => {
       </GlassCard>
 
       {/* Features & Benefits List */}
-      <GlassCard className="p-6 sm:p-7 rounded-3xl border space-y-4 my-3">
-        <h3 className={`font-bold text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'} uppercase tracking-wider`}>
+      <GlassCard className={`p-6 sm:p-7 rounded-3xl border space-y-4 my-3 ${isLight ? 'bg-white border-slate-200 shadow-sm' : ''}`}>
+        <h3 className={`font-black text-xs uppercase tracking-wider ${isLight ? 'text-purple-950' : 'text-slate-300'}`}>
           EVERYTHING UNLOCKED WITH PRO ACCESS:
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           {benefits.map((b, idx) => (
             <div key={idx} className="flex items-start gap-2.5">
-              <CheckCircle2 className="w-4 h-4 text-[#00E676] flex-shrink-0 mt-0.5" />
-              <span className={`text-xs font-medium leading-relaxed ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+              <CheckCircle2 className={`w-4 h-4 flex-shrink-0 mt-0.5 ${isLight ? 'text-emerald-600' : 'text-[#00E676]'}`} />
+              <span className={`text-xs font-semibold leading-relaxed ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>
                 {b}
               </span>
             </div>

@@ -3,8 +3,9 @@ import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { NeonButton } from '../components/NeonButton';
 import { FormattedTextWithAppEmojis, AppEmoji } from '../components/AppEmoji';
-import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Wand2, Volume2, Image as ImageIcon, X, Eye, ChevronDown } from 'lucide-react';
-import { speakWithAlexaVoice } from '../utils/speechUtils';
+import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Wand2, Volume2, Image as ImageIcon, X, Eye, ChevronDown, Plus, Play, Square, Mic, MicOff, Radio, Zap } from 'lucide-react';
+import { speakWithGeminiVoice, speakWithTaskFlowAiVoice, stopAllSpeech } from '../utils/speechUtils';
+import { GeminiLiveSessionController, GeminiLiveState } from '../utils/geminiLiveAudio';
 import { autoCorrectText } from '../utils/autoCorrect';
 
 interface ChatMessage {
@@ -13,6 +14,7 @@ interface ChatMessage {
   text: string;
   timestamp: string;
   imageUrl?: string;
+  imageUrls?: string[];
 }
 
 interface IncomingEmail {
@@ -47,7 +49,7 @@ export const AiAssistantScreen: React.FC = () => {
       {
         id: '1',
         sender: 'assistant',
-        text: `Hello ${userProfile.userName || 'Executive'}! 👋 I am your 24/7 Executive AI Assistant.\n\nI am actively monitoring your **Google Drive, Calendar, and Gmail** (${userProfile.userEmail || 'Connected'}).\n\nHow can I assist you with **${userProfile.businessName}** today?\n\n• **Open Interactive Chat**: Ask anything, brainstorm ideas, draft emails, or roleplay scenarios.\n• **Image & Document Vision**: Attach any photo, chart, screenshot, or contract for deep visual analysis.\n• **Revenue Optimization**: Tailored action plans for your **${userProfile.currencySymbol}${(userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 0).toLocaleString()}** goal.`,
+        text: `Hello ${userProfile.userName || 'Executive'}! 👋 I am your Task Flow AI Assistant.\n\nI can chat with you, reply to any inquiry, analyze multiple images, and optimize your business operations.\n\n• **Multi-Image Vision**: Attach multiple images, charts, documents, or photos for instant visual analysis.\n• **Executive Strategy & Workflows**: Customized insights tailored for **${userProfile.businessName}** and your **${userProfile.currencySymbol}${(userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 0).toLocaleString()}** revenue goal.`,
         timestamp: 'Just now',
       },
     ];
@@ -67,10 +69,121 @@ export const AiAssistantScreen: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
+
+  // Gemini Live Two-Way Voice State
+  const [isLiveActive, setIsLiveActive] = useState(false);
+  const [liveState, setLiveState] = useState<GeminiLiveState>('idle');
+  const [liveUserTranscript, setLiveUserTranscript] = useState('');
+  const [liveModelTranscript, setLiveModelTranscript] = useState('');
+  const [inputVolume, setInputVolume] = useState(0);
+  const [outputVolume, setOutputVolume] = useState(0);
+  const liveSessionRef = useRef<GeminiLiveSessionController | null>(null);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cleanup Live Voice on component unmount
+  useEffect(() => {
+    return () => {
+      if (liveSessionRef.current) {
+        liveSessionRef.current.stop();
+      }
+    };
+  }, []);
+
+  // Toggle Gemini Live Two-Way Voice Session (Natural Female Voice - Aoede)
+  const toggleGeminiLive = async () => {
+    if (isLiveActive) {
+      if (liveSessionRef.current) {
+        liveSessionRef.current.stop();
+        liveSessionRef.current = null;
+      }
+      setIsLiveActive(false);
+      setLiveState('idle');
+      setLiveUserTranscript('');
+      setLiveModelTranscript('');
+      setInputVolume(0);
+      setOutputVolume(0);
+      triggerNotification('Gemini Live Voice Ended 🎙️', 'Two-way voice session concluded.', 'AI');
+      return;
+    }
+
+    stopAllSpeech();
+    setIsLiveActive(true);
+    setLiveState('connecting');
+    setLiveUserTranscript('');
+    setLiveModelTranscript('');
+
+    const session = new GeminiLiveSessionController({
+      onStateChange: (newState) => {
+        setLiveState(newState);
+        if (newState === 'closed' || newState === 'error') {
+          setIsLiveActive(false);
+        }
+      },
+      onUserTranscript: (accumulated) => {
+        setLiveUserTranscript(accumulated);
+      },
+      onModelTranscript: (accumulated) => {
+        setLiveModelTranscript(accumulated);
+      },
+      onTurnComplete: (userText, modelText) => {
+        if (userText || modelText) {
+          const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const newEntries: ChatMessage[] = [];
+          if (userText) {
+            newEntries.push({
+              id: Date.now().toString(),
+              sender: 'user',
+              text: userText,
+              timestamp,
+            });
+          }
+          if (modelText) {
+            newEntries.push({
+              id: (Date.now() + 1).toString(),
+              sender: 'assistant',
+              text: modelText,
+              timestamp,
+            });
+          }
+          setMessages((prev) => [...prev, ...newEntries]);
+          setLiveUserTranscript('');
+          setLiveModelTranscript('');
+        }
+      },
+      onInputVolume: (vol) => {
+        setInputVolume(vol);
+      },
+      onOutputVolume: (vol) => {
+        setOutputVolume(vol);
+      },
+      onError: (errMsg) => {
+        triggerNotification('Gemini Live Voice Notice', errMsg, 'AI');
+        setIsLiveActive(false);
+      },
+    });
+
+    liveSessionRef.current = session;
+    const success = await session.start();
+    if (!success) {
+      setIsLiveActive(false);
+      liveSessionRef.current = null;
+    } else {
+      triggerNotification('Gemini Live Voice Active 🎙️', 'Connected with Natural Female Voice (Kore). Speak freely!', 'AI');
+    }
+  };
+
+  // User Interruption Trigger
+  const handleInterruptLive = () => {
+    if (liveSessionRef.current) {
+      liveSessionRef.current.interrupt();
+      setLiveModelTranscript('');
+    }
+  };
 
   // Listen for execute-ai-prompt event (e.g. from Voice Command Sheet Run button)
   useEffect(() => {
@@ -85,13 +198,19 @@ export const AiAssistantScreen: React.FC = () => {
     return () => window.removeEventListener('execute-ai-prompt', handleExecutePromptEvent);
   }, []);
 
+  // Handle multiple image selection
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileArray = Array.from(files);
+    let loadedCount = 0;
+    const newImages: string[] = [];
+
+    fileArray.forEach((file) => {
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result as string;
-        // Check image dimension & compress gently only if extraordinarily huge (> 2400px)
         const img = new Image();
         img.onload = () => {
           const maxDim = 2048;
@@ -113,22 +232,50 @@ export const AiAssistantScreen: React.FC = () => {
               ctx.imageSmoothingEnabled = true;
               ctx.imageSmoothingQuality = 'high';
               ctx.drawImage(img, 0, 0, width, height);
-              const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
-              setSelectedImage(compressedDataUrl);
+              newImages.push(canvas.toDataURL('image/jpeg', 0.92));
             } else {
-              setSelectedImage(result);
+              newImages.push(result);
             }
           } else {
-            setSelectedImage(result);
+            newImages.push(result);
           }
-          triggerNotification('Image Attached 🖼️', 'Image uploaded successfully. AI is ready to analyze every detail!', 'SYSTEM');
+
+          loadedCount++;
+          if (loadedCount === fileArray.length) {
+            setSelectedImages((prev) => [...prev, ...newImages]);
+            triggerNotification(
+              'Images Attached 🖼️',
+              `${newImages.length} image${newImages.length > 1 ? 's' : ''} added. AI is ready to inspect!`,
+              'SYSTEM'
+            );
+          }
         };
         img.src = result;
       };
       reader.readAsDataURL(file);
-      // Reset input value so user can re-select the same image if needed
-      e.target.value = '';
+    });
+
+    // Reset input value so user can re-select if needed
+    e.target.value = '';
+  };
+
+  const removeSelectedImage = (indexToRemove: number) => {
+    setSelectedImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  // Speak AI reply in Task Flow AI voice
+  const handleSpeakText = (msgId: string, text: string) => {
+    if (speakingMessageId === msgId) {
+      stopAllSpeech();
+      setSpeakingMessageId(null);
+      return;
     }
+
+    stopAllSpeech();
+    setSpeakingMessageId(msgId);
+    speakWithTaskFlowAiVoice(text, {
+      onEnd: () => setSpeakingMessageId(null),
+    });
   };
 
   // Gmail smart response state
@@ -193,43 +340,55 @@ export const AiAssistantScreen: React.FC = () => {
     triggerNotification('Chat History Cleared 🧹', 'AI Assistant conversation has been reset.', 'AI');
   };
 
-  const handleSendMessage = async (customText?: string) => {
+  const handleSendMessage = async (customText?: string, fromVoice = false) => {
     const rawText = (customText || inputText).trim();
-    if ((!rawText && !selectedImage) || isTyping) return;
+    if ((!rawText && selectedImages.length === 0) || isTyping) return;
 
-    const textToSend = autoCorrectText(rawText || (selectedImage ? 'Attached Image Analysis Request' : ''));
-    const attachedImg = selectedImage;
+    const textToSend = autoCorrectText(
+      rawText || (selectedImages.length > 0 ? `Analysis Request for ${selectedImages.length} attached image${selectedImages.length > 1 ? 's' : ''}` : '')
+    );
+    const attachedImgs = [...selectedImages];
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       sender: 'user',
       text: textToSend,
-      imageUrl: attachedImg || undefined,
+      imageUrl: attachedImgs[0] || undefined,
+      imageUrls: attachedImgs.length > 0 ? attachedImgs : undefined,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setInputText('');
-    setSelectedImage(null);
+    setSelectedImages([]);
     setIsTyping(true);
 
     try {
-      const promptWithImgContext = attachedImg
-        ? (textToSend && textToSend !== 'Attached Image Analysis Request'
+      const promptWithImgContext = attachedImgs.length > 0
+        ? (textToSend && !textToSend.startsWith('Analysis Request')
             ? textToSend
-            : 'Please thoroughly analyze and inspect every detail of this attached image. Transcribe all text, numbers, layout structures, diagrams, patterns, and provide an executive strategic breakdown.')
+            : `Please thoroughly analyze and inspect all ${attachedImgs.length} attached images in detail. Transcribe all text, numbers, layout structures, diagrams, patterns, and provide an executive strategic breakdown.`)
         : textToSend;
 
-      const aiReply = await askAssistant(promptWithImgContext, attachedImg || undefined);
+      const aiReply = await askAssistant(promptWithImgContext, attachedImgs.length > 0 ? attachedImgs : undefined);
 
+      const assistantMsgId = (Date.now() + 1).toString();
       const assistantMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: assistantMsgId,
         sender: 'assistant',
         text: aiReply,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+
+      // Automatically speak the reply in Task Flow AI voice if requested
+      if (fromVoice) {
+        setSpeakingMessageId(assistantMsgId);
+        speakWithTaskFlowAiVoice(aiReply, {
+          onEnd: () => setSpeakingMessageId(null),
+        });
+      }
     } catch (e) {
       const errorMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -621,8 +780,24 @@ export const AiAssistantScreen: React.FC = () => {
                   renderFormattedText(m.text)
                 ) : (
                   <div className="space-y-2.5">
-                    {/* Neat Image Display on Top of Message */}
-                    {m.imageUrl && (
+                    {/* Multiple Image Display on Top of Message */}
+                    {m.imageUrls && m.imageUrls.length > 0 ? (
+                      <div className={`grid gap-2 ${m.imageUrls.length === 1 ? 'grid-cols-1' : m.imageUrls.length === 2 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                        {m.imageUrls.map((imgUrl, imgIdx) => (
+                          <div key={imgIdx} className="rounded-xl overflow-hidden border border-white/25 bg-black/20 shadow-md group relative">
+                            <img
+                              src={imgUrl}
+                              alt={`Attached asset ${imgIdx + 1}`}
+                              onClick={() => setPreviewModalImage(imgUrl)}
+                              className="w-full h-28 sm:h-36 object-cover cursor-zoom-in transition-transform duration-200 group-hover:scale-[1.02]"
+                            />
+                            <div className="absolute top-1.5 right-1.5 bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded text-[9px] text-white flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                              <Eye className="w-2.5 h-2.5" /> Zoom
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : m.imageUrl ? (
                       <div className="rounded-xl overflow-hidden border border-white/25 bg-black/20 shadow-md group relative">
                         <img
                           src={m.imageUrl}
@@ -634,7 +809,7 @@ export const AiAssistantScreen: React.FC = () => {
                           <Eye className="w-3 h-3" /> Tap to zoom
                         </div>
                       </div>
-                    )}
+                    ) : null}
                     {m.text && (
                       <p className="whitespace-pre-line leading-relaxed font-medium">{m.text}</p>
                     )}
@@ -648,15 +823,25 @@ export const AiAssistantScreen: React.FC = () => {
                     <div className="flex items-center gap-2.5">
                       <button
                         type="button"
-                        onClick={() => speakWithAlexaVoice(m.text)}
+                        onClick={() => handleSpeakText(m.id, m.text)}
                         className={`flex items-center gap-1 font-semibold transition-colors cursor-pointer ${
-                          isLight
+                          speakingMessageId === m.id
+                            ? 'text-pink-400 animate-pulse'
+                            : isLight
                             ? 'text-purple-600 hover:text-purple-900'
                             : 'text-[#06B6D4] hover:text-cyan-300'
                         }`}
-                        title="Listen in Amazon Alexa AI Voice"
+                        title={speakingMessageId === m.id ? 'Stop Speech' : 'Listen in Gemini Voice'}
                       >
-                        <Volume2 className="w-3 h-3" /> Speak
+                        {speakingMessageId === m.id ? (
+                          <>
+                            <Square className="w-3 h-3 fill-pink-400" /> Stop Voice
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 className="w-3 h-3" /> Speak (Gemini)
+                          </>
+                        )}
                       </button>
 
                       <button
@@ -734,24 +919,169 @@ export const AiAssistantScreen: React.FC = () => {
         ))}
       </div>
 
-      {/* Message Input Box with Image Upload & Auto-Correct */}
+      {/* Gemini Live Two-Way Voice HUD Banner */}
+      {isLiveActive && (
+        <div
+          className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2.5 shadow-xl animate-fade-in ${
+            isLight
+              ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-300 text-slate-800 shadow-purple-200/50'
+              : 'bg-gradient-to-r from-[#1E1338]/95 via-[#131726]/95 to-[#0F2236]/95 border-purple-500/40 text-white shadow-[0_0_25px_rgba(124,58,237,0.25)]'
+          }`}
+        >
+          {/* Header with state badges */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-pink-500"></span>
+              </span>
+              <span className="text-xs font-extrabold tracking-wide uppercase bg-gradient-to-r from-pink-400 to-cyan-300 bg-clip-text text-transparent flex items-center gap-1">
+                <Radio className="w-3.5 h-3.5 text-pink-400 animate-pulse" />
+                Gemini Live Voice (Female • Kore)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Interruption Button */}
+              {liveState === 'speaking' && (
+                <button
+                  type="button"
+                  onClick={handleInterruptLive}
+                  className="px-2.5 py-1 rounded-xl bg-pink-600/20 border border-pink-500/50 text-pink-300 hover:bg-pink-600/40 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-sm active:scale-95"
+                  title="Interrupt Gemini's response"
+                >
+                  <Zap className="w-3 h-3 text-pink-400" />
+                  Interrupt
+                </button>
+              )}
+
+              {/* Status Pill */}
+              <span
+                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                  liveState === 'speaking'
+                    ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-300 animate-pulse'
+                    : liveState === 'listening'
+                    ? 'bg-pink-500/20 border-pink-400/50 text-pink-300 animate-pulse'
+                    : liveState === 'connecting'
+                    ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
+                    : liveState === 'interrupted'
+                    ? 'bg-orange-500/20 border-orange-400/50 text-orange-300'
+                    : 'bg-slate-500/20 border-slate-400/50 text-slate-300'
+                }`}
+              >
+                {liveState === 'speaking'
+                  ? 'Gemini Speaking'
+                  : liveState === 'listening'
+                  ? 'Listening to You...'
+                  : liveState === 'connecting'
+                  ? 'Connecting...'
+                  : liveState === 'interrupted'
+                  ? 'Interrupted'
+                  : 'Ready'}
+              </span>
+
+              {/* End Voice Call */}
+              <button
+                type="button"
+                onClick={toggleGeminiLive}
+                className="p-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                title="End Gemini Live Voice Chat"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Dynamic Audio Equalizer Waveform */}
+          <div className="flex items-center justify-center gap-1.5 py-1">
+            {[40, 70, 100, 60, 90, 45, 80, 55, 95, 65, 85, 50, 75, 40].map((baseHeight, i) => {
+              const activeVolume = liveState === 'speaking' ? outputVolume : liveState === 'listening' ? inputVolume : 10;
+              const scaledHeight = Math.max(6, Math.min(32, Math.round((baseHeight * (activeVolume + 15)) / 100)));
+              const isCyan = i % 2 === 0;
+              return (
+                <div
+                  key={i}
+                  style={{ height: `${scaledHeight}px` }}
+                  className={`w-1 rounded-full transition-all duration-75 ${
+                    liveState === 'speaking'
+                      ? isCyan
+                        ? 'bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.6)]'
+                        : 'bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.6)]'
+                      : liveState === 'listening'
+                      ? 'bg-pink-400 shadow-[0_0_8px_rgba(244,114,182,0.6)]'
+                      : 'bg-slate-600'
+                  }`}
+                />
+              );
+            })}
+          </div>
+
+          {/* Live transcripts display */}
+          {(liveUserTranscript || liveModelTranscript) && (
+            <div className="flex flex-col gap-1 text-xs max-h-24 overflow-y-auto px-2 py-1 rounded-xl bg-black/20 border border-white/5">
+              {liveUserTranscript && (
+                <div className="text-slate-300">
+                  <span className="font-bold text-pink-400">You:</span> {liveUserTranscript}
+                </div>
+              )}
+              {liveModelTranscript && (
+                <div className="text-slate-200">
+                  <span className="font-bold text-cyan-400">Gemini:</span> {liveModelTranscript}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Message Input Box with Multi-Image Upload & Gemini Live Microphone */}
       <div className="flex flex-col gap-1.5 flex-shrink-0 w-full min-w-0">
         <input
           type="file"
           ref={fileInputRef}
           accept="image/*"
+          multiple
           className="hidden"
           onChange={handleImageSelect}
         />
 
-        {selectedImage && (
-          <div className="flex items-center gap-2 p-2 bg-[#131726]/90 border border-purple-500/40 rounded-xl w-fit">
-            <img src={selectedImage} alt="Attachment Preview" className="w-10 h-10 object-cover rounded-lg" />
-            <span className="text-xs text-purple-300 font-semibold">Image attached</span>
+        {/* Selected Images Strip */}
+        {selectedImages.length > 0 && (
+          <div className="flex items-center gap-2 p-2 bg-[#131726]/90 border border-purple-500/40 rounded-xl overflow-x-auto scrollbar-none">
+            <span className="text-[11px] text-purple-300 font-bold whitespace-nowrap pl-1">
+              {selectedImages.length} Image{selectedImages.length > 1 ? 's' : ''} Attached:
+            </span>
+            <div className="flex items-center gap-2">
+              {selectedImages.map((img, idx) => (
+                <div key={idx} className="relative group shrink-0">
+                  <img
+                    src={img}
+                    alt={`Selected attachment ${idx + 1}`}
+                    onClick={() => setPreviewModalImage(img)}
+                    className="w-10 h-10 object-cover rounded-lg border border-purple-400/50 cursor-pointer"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSelectedImage(idx)}
+                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] hover:bg-red-500 shadow cursor-pointer"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
             <button
               type="button"
-              onClick={() => setSelectedImage(null)}
-              className="p-1 text-slate-400 hover:text-red-400 cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-2 py-1 rounded-lg border border-dashed border-purple-400/60 text-purple-300 text-[11px] font-semibold hover:bg-purple-500/20 whitespace-nowrap flex items-center gap-1 cursor-pointer ml-1"
+            >
+              <Plus className="w-3 h-3" /> Add More
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedImages([])}
+              className="p-1 text-slate-400 hover:text-red-400 cursor-pointer text-xs ml-auto"
+              title="Clear all attached images"
             >
               <X className="w-4 h-4" />
             </button>
@@ -782,7 +1112,7 @@ export const AiAssistantScreen: React.FC = () => {
               autoCorrect="on"
               autoCapitalize="sentences"
               spellCheck={true}
-              placeholder="Ask AI anything about your business, proposals, or tasks..."
+              placeholder="Ask AI anything, brainstorm, draft, or upload images..."
               className={`w-full border rounded-2xl pl-4 pr-10 py-3 text-sm focus:outline-none ${
                 isLight
                   ? 'bg-white border-purple-300 text-slate-900 placeholder-slate-400 focus:border-purple-600 shadow-sm'
@@ -801,13 +1131,29 @@ export const AiAssistantScreen: React.FC = () => {
             )}
           </div>
 
-          {/* Image Upload Icon placed right before Send Icon */}
+          {/* Gemini Live Microphone Button */}
+          <button
+            type="button"
+            onClick={toggleGeminiLive}
+            title={isLiveActive ? 'End Gemini Live Voice' : 'Gemini Live Voice Chat (Natural Female Voice)'}
+            className={`relative p-3 rounded-2xl border transition-all cursor-pointer shrink-0 ${
+              isLiveActive
+                ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white border-pink-400 shadow-[0_0_15px_rgba(236,72,153,0.5)] animate-pulse'
+                : isLight
+                ? 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700'
+                : 'bg-[#131726] hover:bg-[#1E2338] border-[#2E3552] text-pink-400 hover:border-pink-400 hover:text-pink-300'
+            }`}
+          >
+            {isLiveActive ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          </button>
+
+          {/* Multiple Image Upload Icon */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            title="Attach Image"
-            className={`p-3 rounded-2xl border transition-all cursor-pointer shrink-0 ${
-              selectedImage
+            title="Attach Multiple Images"
+            className={`relative p-3 rounded-2xl border transition-all cursor-pointer shrink-0 ${
+              selectedImages.length > 0
                 ? 'bg-purple-600 text-white border-purple-400'
                 : isLight
                 ? 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700'
@@ -815,6 +1161,11 @@ export const AiAssistantScreen: React.FC = () => {
             }`}
           >
             <ImageIcon className="w-5 h-5" />
+            {selectedImages.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-pink-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
+                {selectedImages.length}
+              </span>
+            )}
           </button>
 
           {/* Send Icon */}

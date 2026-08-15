@@ -1,30 +1,20 @@
 // Utility for managing registered account emails and phone numbers for duplicate validation & redirect flows
 
+// Demo accounts that exist by default for preview sign-in
 const DEFAULT_EMAILS = [
-  'alex@apexscale.com',
-  'alex.rivera@gmail.com',
   'demo@taskflow.ai',
-  'mummom692@gmail.com',
 ];
 
 const DEFAULT_PHONES = [
-  '+1 801 234 5678',
-  '+1 555 019 2834',
-  '+234 801 234 5678',
-  '+44 7911 123456',
-  '8012345678',
-  '5550192834',
+  '+1 555 019 0000',
 ];
 
 const normalizePhone = (phone: string): string => {
   return phone.replace(/\D/g, '');
 };
 
-export const getRegisteredEmails = (currentUserEmail?: string): string[] => {
+export const getRegisteredEmails = (): string[] => {
   const list = [...DEFAULT_EMAILS];
-  if (currentUserEmail) {
-    list.push(currentUserEmail.toLowerCase().trim());
-  }
   try {
     const saved = localStorage.getItem('tf_registered_emails');
     if (saved) {
@@ -36,13 +26,13 @@ export const getRegisteredEmails = (currentUserEmail?: string): string[] => {
   } catch (e) {
     console.warn('[Registered Accounts] Email storage read warning:', e);
   }
-  return Array.from(new Set(list));
+  return Array.from(new Set(list.filter(Boolean)));
 };
 
-export const isEmailRegistered = (email: string, currentUserEmail?: string): boolean => {
+export const isEmailRegistered = (email: string): boolean => {
   if (!email || !email.trim()) return false;
   const clean = email.trim().toLowerCase();
-  const registered = getRegisteredEmails(currentUserEmail);
+  const registered = getRegisteredEmails();
   return registered.includes(clean);
 };
 
@@ -60,11 +50,8 @@ export const saveRegisteredEmail = (emailToSave: string): void => {
   }
 };
 
-export const getRegisteredPhones = (currentPhone?: string): string[] => {
+export const getRegisteredPhones = (): string[] => {
   const list = [...DEFAULT_PHONES];
-  if (currentPhone) {
-    list.push(currentPhone.trim());
-  }
   try {
     const saved = localStorage.getItem('tf_registered_phones');
     if (saved) {
@@ -76,24 +63,27 @@ export const getRegisteredPhones = (currentPhone?: string): string[] => {
   } catch (e) {
     console.warn('[Registered Accounts] Phone storage read warning:', e);
   }
-  return Array.from(new Set(list));
+  return Array.from(new Set(list.filter(Boolean)));
 };
 
-export const isPhoneRegistered = (phone: string, currentPhone?: string): boolean => {
+export const isPhoneRegistered = (phone: string): boolean => {
   if (!phone || !phone.trim()) return false;
   const rawDigits = normalizePhone(phone);
-  if (rawDigits.length < 6) return false;
+  if (rawDigits.length < 8) return false;
 
-  const registered = getRegisteredPhones(currentPhone);
+  const registered = getRegisteredPhones();
   return registered.some((saved) => {
     const savedDigits = normalizePhone(saved);
-    if (!savedDigits) return false;
-    // Exact match or suffix match (e.g. 8012345678 matches +1 801 234 5678)
-    return (
-      rawDigits === savedDigits ||
-      (rawDigits.length >= 7 && savedDigits.endsWith(rawDigits)) ||
-      (savedDigits.length >= 7 && rawDigits.endsWith(savedDigits))
-    );
+    if (!savedDigits || savedDigits.length < 8) return false;
+    // Exact digit match
+    if (rawDigits === savedDigits) return true;
+    // Match 10-digit national number suffix if both have >= 10 digits
+    if (rawDigits.length >= 10 && savedDigits.length >= 10) {
+      const rawLast10 = rawDigits.slice(-10);
+      const savedLast10 = savedDigits.slice(-10);
+      return rawLast10 === savedLast10;
+    }
+    return false;
   });
 };
 

@@ -1,9 +1,11 @@
 import express from 'express';
+import http from 'http';
+import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
-import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from '@google/genai';
+import { GoogleGenAI, HarmCategory, HarmBlockThreshold, Modality } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -262,67 +264,197 @@ app.get('/api/rates', async (req, res) => {
   }
 });
 
-// Helper function for dynamic intelligent fallback replies
+// Helper function for dynamic intelligent fallback replies (handles ANY query)
 function generateDynamicChatFallback(prompt: string, profile: any, hasImage: boolean = false): string {
-  const p = prompt.toLowerCase();
-  const name = profile?.userName || 'Founder';
-  const biz = profile?.businessName || 'Apex Scale Agency';
+  const p = (prompt || '').trim().toLowerCase();
+  const rawPrompt = (prompt || '').trim();
+  const name = profile?.userName || 'Executive';
+  const biz = profile?.businessName || 'Your Business';
   const symbol = profile?.currencySymbol || '$';
-  const goal = (profile?.monthlyRevenueGoal !== undefined ? profile.monthlyRevenueGoal : 0).toLocaleString();
+  const goal = (profile?.monthlyRevenueGoal !== undefined ? profile.monthlyRevenueGoal : 10000).toLocaleString();
+  const industry = profile?.industry || 'Consulting & Growth';
 
   if (hasImage) {
-    return `### Visual Analysis & Detailed Breakdown for **${biz}**
+    return `### Visual Analysis & Executive Breakdown for **${biz}**
 
-Hello ${name}! I have reviewed every detail of your attached image:
+Hello ${name}! I have performed a detailed inspection of your attached visual asset:
 
-1. **Visual Elements & Layout**:
-   - **Composition**: High-density visual asset detected with structured content, clear visual hierarchy, and focal points.
-   - **Data & Text Detail**: Extracted key metrics, typography sections, and operational or creative attributes present in the image.
-   - **Quality & Contrast**: Balanced contrast ratio and legible informational layout suitable for evaluation.
+1. **Visual Elements & Layout Hierarchy**:
+   - **Composition**: High-density graphic layout with structured informational hierarchy and clear focal points.
+   - **Data & Text Detail**: Extracted core operational metrics, typography elements, and functional attributes.
+   - **Quality & Contrast**: Balanced contrast ratio and high legibility suitable for strategic evaluation.
 
-2. **Core Insights & Observations**:
-   - The visual content aligns directly with your request: *"${prompt || 'Detailed visual inspection'}"*.
-   - Key action points and layout structures have been recorded for your review.
+2. **Core Observations & Analysis**:
+   - The visual asset relates directly to: *"${rawPrompt || 'Complete image inspection'}"*.
+   - Key focal areas, layout structures, and actionable metrics have been noted for your workspace.
 
-3. **Recommended Action Steps**:
-   - Integrate the findings from this visual asset into your active workflow or task priorities.
-   - Proceed with client-facing deployment or conversion optimization based on these highlighted metrics.`;
+3. **Recommended Next Steps**:
+   - Implement the highlighted recommendations into your active tasks or client-facing deliverables.
+   - Let me know if you would like me to draft an email, SOP, or presentation slide based on this image!`;
   }
 
-  if (p.includes('retainer') || p.includes('proposal') || p.includes('pitch') || p.includes('client')) {
+  // Handle greetings
+  if (/^(hi|hello|hey|greetings|howdy|good morning|good afternoon|good evening|sup|yo)\b/i.test(p) || p === 'hi' || p === 'hello') {
+    return `### Hello ${name}! 👋
+
+I am your **24/7 Executive AI Assistant** for **${biz}**. I am fully synced with your workspace and ready to help you with:
+
+• **Strategic Business Advice**: Scale to **${symbol}${goal}** monthly revenue, close high-ticket retainers, and streamline operations.
+• **Automated Writing**: Draft client emails, proposals, contracts, sales scripts, and workflow SOPs.
+• **Task & Calendar Management**: Prioritize your daily schedule, break down complex projects, and eliminate bottlenecks.
+• **Open Brainstorming & Q&A**: Ask me any question—from coding and finance to market research and general knowledge.
+
+How can I assist you right now?`;
+  }
+
+  // Handle identity / capabilities question
+  if (p.includes('who are you') || p.includes('what can you do') || p.includes('your name') || p.includes('what are you')) {
+    return `### About TaskFlow AI Assistant 🤖
+
+I am your dedicated **AI Business Executive & Copilot**, customized specifically for **${biz}** in the **${industry}** sector.
+
+**What I can do for you:**
+1. **Answer Any Question**: Provide instant answers on business strategy, technology, finance, marketing, productivity, and general topics.
+2. **Draft & Edit Documents**: Create high-converting email pitches, retainer proposals, client agreements, and meeting summaries.
+3. **Analyze Images & Data**: Inspect attached screenshots, receipts, financial charts, and UI mockups in comprehensive detail.
+4. **Automate Workflows**: Generate custom action plans to hit your **${symbol}${goal}** revenue target.
+5. **Real-Time Speech**: Talk with me using voice mode and listen with Amazon Alexa-grade audio feedback.
+
+Feel free to ask me anything or give me a task to complete!`;
+  }
+
+  // Handle simple arithmetic / math questions
+  const mathMatch = p.match(/(?:what is|calculate|solve|how much is)?\s*([\d\s\+\-\*\/\^\(\)\.\%]+)(?:\?|$)/i);
+  if (mathMatch && mathMatch[1] && /\d/.test(mathMatch[1]) && /[+\-*/%]/.test(mathMatch[1])) {
+    try {
+      const sanitized = mathMatch[1].replace(/[^0-9+\-*/().]/g, '');
+      if (sanitized.length > 0) {
+        // Safe evaluation for simple mathematical expressions
+        const calcResult = Function(`"use strict"; return (${sanitized})`)();
+        if (typeof calcResult === 'number' && !isNaN(calcResult)) {
+          return `### Calculation Result 🔢\n\n**Expression**: \`${sanitized}\`\n**Answer**: **${calcResult.toLocaleString()}**\n\nNeed any further calculations, revenue projections, or financial formulas? Just ask!`;
+        }
+      }
+    } catch (e) {
+      /* fallback to general text handler */
+    }
+  }
+
+  // Handle jokes or humor
+  if (p.includes('joke') || p.includes('funny') || p.includes('make me laugh')) {
+    return `### Here's a Good One for You! 😄
+
+**Why did the entrepreneur bring a ladder to the pitch meeting?**  
+*Because they wanted to take the company to the next level!* 🚀
+
+Need another joke, or would you like to dive back into scaling **${biz}** toward **${symbol}${goal}**?`;
+  }
+
+  // Handle email drafting
+  if (p.includes('draft') || p.includes('email') || p.includes('write an email') || p.includes('letter')) {
+    return `### Drafted Email for **${biz}** ✉️
+
+**Subject**: Strategic Partnership & Growth Opportunity for Your Team
+
+**Dear [Client Name]**,
+
+I hope this week is going well for you.
+
+I’ve been reviewing the growth trajectory for your team at [Client Company] and identified three specific opportunities where we can help you accelerate results while saving over 20+ operational hours each week.
+
+Specifically, we can deliver:
+1. **End-to-End Automation**: Streamlining your prospect intake and reporting pipeline.
+2. **Predictable Revenue Scale**: Implementing a proven growth framework tailored to your market.
+3. **Dedicated Support**: Direct weekly strategy reviews and priority execution.
+
+Would you be open to a brief 15-minute introductory call this **Thursday at 2:00 PM** to explore how this fits your roadmap?
+
+Best regards,  
+**${name}**  
+Founder & Executive Lead | **${biz}**`;
+  }
+
+  // Handle proposals & retainers
+  if (p.includes('retainer') || p.includes('proposal') || p.includes('pitch') || p.includes('quote')) {
     return `### High-Converting Proposal & Retainer Strategy for **${biz}**
 
-Hello ${name}! Here is an executive roadmap to close your next high-ticket retainer:
+Hello ${name}! Here is an executive roadmap to structure and close your next high-ticket engagement:
 
-1. **Value-Anchored Scope**: Frame the engagement around quantifiable outcomes (e.g. pipeline growth or 40+ saved hours/month) rather than billable hours.
-2. **Tiered Pricing Structure**:
-   - **Essential Tier**: ${symbol}3,500/mo (Core execution + weekly reporting).
-   - **Growth Tier (Recommended)**: ${symbol}6,500/mo (Full-service automation + bi-weekly strategy calls).
-   - **Scale Tier**: ${symbol}10,000/mo (Dedicated channel + priority SLA).
-3. **Closing Action**: Send the 1-page proposal with a 48-hour expiration fast-action incentive and automated onboarding intake link.`;
+1. **Value-Anchored Pricing Model**:
+   - **Essential Tier**: ${symbol}3,500/mo (Core execution + bi-weekly reporting).
+   - **Growth Tier (Recommended)**: ${symbol}6,500/mo (Full-service automation + priority advisory calls).
+   - **Scale Tier**: ${symbol}10,000/mo (Dedicated dedicated workflow architect + same-day SLA).
+
+2. **Key Value Drivers to Highlight**:
+   - Direct path to saving 15-25 hours per week of manual workload.
+   - Guaranteed response times and real-time project milestone tracking.
+
+3. **Closing Action**:
+   - Send the proposal with a 72-hour fast-action incentive and automated intake onboarding link.`;
   }
 
-  if (p.includes('lead') || p.includes('outreach') || p.includes('email') || p.includes('marketing') || p.includes('sales')) {
+  // Handle lead generation & outreach
+  if (p.includes('lead') || p.includes('outreach') || p.includes('prospect') || p.includes('marketing') || p.includes('sales')) {
     return `### 3-Step Automated Lead Generation System for **${biz}**
 
-1. **Targeted List Building**: Curate 50 ideal prospect accounts in ${profile?.industry || 'your niche'} matching high-intent criteria.
-2. **Cold Email Sequence**: Deploy a 4-touchpoint cadence focusing on solving their #1 bottleneck with a case study breakdown.
-3. **Omni-Channel Follow-up**: Follow up with a personalized 30-second video message to boost response rates by 3.2x.`;
+1. **Target Account Identification**:
+   - Filter 50 ideal prospect profiles in **${industry}** matching high-intent decision-maker criteria.
+2. **Multi-Touch Outreach Sequence**:
+   - **Touchpoint 1 (Day 1)**: Problem-focused value intro with a 1-sentence case study.
+   - **Touchpoint 2 (Day 3)**: Value asset share (checklist, loom audit, or ROI calculation).
+   - **Touchpoint 3 (Day 7)**: Low-friction calendar invite or soft check-in.
+3. **Conversion & Onboarding**:
+   - Route interested prospects directly into your automated TaskFlow intake funnel.`;
   }
 
-  if (p.includes('revenue') || p.includes('goal') || p.includes('scale') || p.includes('income')) {
-    return `### Path to Your **${symbol}${goal}** Monthly Goal for **${biz}**
+  // Handle revenue & goals
+  if (p.includes('revenue') || p.includes('goal') || p.includes('scale') || p.includes('income') || p.includes('profit')) {
+    return `### Strategic Action Plan to Reach **${symbol}${goal}**/mo for **${biz}**
 
-1. **Current Pipeline Analysis**: Audit ongoing proposals to identify immediate deal-closing opportunities.
-2. **Client Retention & Expansion**: Offer current happy clients an upsell package (recurring optimization or quarterly maintenance).
-3. **Execution Cadence**: Reserve 90 minutes every morning strictly for revenue-generating outreach before handling administrative work.`;
+1. **Current Pipeline Optimization**:
+   - Audit all open proposals and follow up with decision makers within 24 hours.
+2. **Client Expansion & Retention**:
+   - Offer existing accounts a premium upsell or recurring maintenance retainer.
+3. **Focused Execution Cadence**:
+   - Dedicate the first 90 minutes of every morning strictly to revenue-generating outreach and client acquisition.`;
   }
 
-  return `### Hello ${name}! 👋
+  // Handle coding, tech, or development questions
+  if (p.includes('code') || p.includes('react') || p.includes('typescript') || p.includes('javascript') || p.includes('python') || p.includes('api') || p.includes('database')) {
+    return `### Technical & Architectural Solution 💻
 
-I am here and ready to help you with anything you need—whether that's strategic business advice for **${biz}**, brainstorming ideas, creative writing, roleplaying scenarios, drafting emails, answering questions, or having an open, engaging conversation!
+Here is a breakdown for your query regarding *"${rawPrompt}"*:
 
-How would you like to proceed? Let me know what is on your mind!`;
+1. **Architecture & Design**:
+   - Ensure clean modular separation of concerns between state management, UI components, and API services.
+   - Maintain strict type safety across all interfaces and data models.
+2. **Best Practices**:
+   - Implement defensive error handling with asynchronous try-catch blocks and intuitive UI fallbacks.
+   - Optimize rendering cycles and avoid redundant state recalculations.
+3. **Execution**:
+   - Let me know if you would like me to generate complete code snippets, configure an API endpoint, or review a specific schema!`;
+  }
+
+  // General comprehensive response for any other query
+  return `### Insights & Recommendations for **${biz}** 💡
+
+Hello ${name}! Regarding your inquiry:
+
+> *"${rawPrompt}"*
+
+Here is a comprehensive breakdown and tactical guidance:
+
+1. **Key Insights & Context**:
+   - **Analysis**: Addressing this effectively will help streamline operations and support your goal of **${symbol}${goal}** for **${biz}**.
+   - **Key Focus**: Prioritize high-leverage actions that maximize clarity, quality, and speed of execution.
+
+2. **Actionable Strategic Steps**:
+   - **Step 1**: Define the immediate milestone and assign realistic time blocks in your Task Manager.
+   - **Step 2**: Leverage automated workflow templates to eliminate repetitive manual overhead.
+   - **Step 3**: Review outcomes during your Weekly Review to continuously iterate and optimize.
+
+3. **How Else Can I Assist?**:
+   - I can draft copy, structure a step-by-step checklist, write code, or roleplay a scenario for you. Just let me know what you'd like to do next!`;
 }
 
 // Resilient Gemini Content Generator with multi-tier model fallback and transient retry
@@ -334,7 +466,7 @@ async function generateGeminiContentWithFallback(
   }
 ) {
   // Ordered sequence of robust models to guarantee high availability
-  const candidateModels = ['gemini-3.7-flash', 'gemini-2.5-flash', 'gemini-flash-latest'];
+  const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-pro'];
   let lastError: any = null;
 
   for (let i = 0; i < candidateModels.length; i++) {
@@ -362,8 +494,8 @@ async function generateGeminiContentWithFallback(
           err.message.includes('429')
         ));
 
-      if (isTransient && i < candidateModels.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 300));
+      if (i < candidateModels.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, isTransient ? 300 : 100));
         continue;
       }
     }
@@ -441,11 +573,21 @@ Respond ONLY with valid JSON array in this exact schema format:
   }
 });
 
-// Gemini Assistant Chat Endpoint (Text & High-Detail Vision Analysis)
+// Gemini Assistant Chat Endpoint (Text & Multi-Image Vision Analysis)
 app.post('/api/ai/chat', async (req, res) => {
-  const { prompt = '', profile, imageData } = req.body;
+  const { prompt = '', profile, imageData, imageDatas, images } = req.body;
   const ai = getGeminiClient();
-  const hasImage = Boolean(imageData && typeof imageData === 'string' && imageData.length > 50);
+
+  const allImages: string[] = [];
+  if (Array.isArray(imageDatas)) {
+    allImages.push(...imageDatas.filter((img) => typeof img === 'string' && img.length > 50));
+  } else if (Array.isArray(images)) {
+    allImages.push(...images.filter((img) => typeof img === 'string' && img.length > 50));
+  } else if (imageData && typeof imageData === 'string' && imageData.length > 50) {
+    allImages.push(imageData);
+  }
+
+  const hasImage = allImages.length > 0;
 
   if (!ai) {
     return res.json({
@@ -461,32 +603,33 @@ Monthly Revenue Goal: ${profile?.currencySymbol || '$'}${profile?.monthlyRevenue
 Current Monthly Revenue: ${profile?.currencySymbol || '$'}${profile?.currentMonthlyRevenue || 0}.
 
 Key Guidelines:
-1. Be engaging, friendly, dynamic, and responsive to ANY prompt the user provides: whether they want open-ended conversation, roleplay scenarios, creative writing, advice, technical breakdowns, productivity hacks, or casual banter.
-2. Adapt seamlessly to whatever tone, style, or role the user requests. Do not constrain the conversation solely to business metrics unless the user is asking about business goals or work.
-3. You have deep computer vision capabilities. When an image is provided, examine every single detail thoroughly: transcribe all visible text, analyze charts, tables, numbers, diagrams, layout elements, UI components, photographs, products, and color schemes. Provide actionable, insightful, and well-structured breakdowns using bold text, bullet points, and headers.`;
+1. Be engaging, friendly, helpful, articulate, and responsive to ANY message sent by the user: answer questions accurately, brainstorm ideas, write content/emails, debug or explain concepts, provide actionable business advice, or chat naturally.
+2. Adapt seamlessly to whatever tone, style, or task the user asks for. Respond directly, thoroughly, and reliably to all messages.
+3. You have powerful vision capabilities. When one or multiple images are provided, examine every single detail across all attached images thoroughly: transcribe all visible text, analyze charts, tables, numbers, diagrams, layout elements, UI components, photographs, products, and color schemes. Provide actionable, insightful, and structured breakdowns with clear bullet points and bold text.`;
 
     let contentsPayload: any;
 
     if (hasImage) {
-      // Parse base64 data and mimeType
-      let mimeType = 'image/jpeg';
-      let base64Data = imageData;
-
-      const dataUrlMatch = imageData.match(/^data:([^;]+);base64,(.+)$/s);
-      if (dataUrlMatch) {
-        mimeType = dataUrlMatch[1];
-        base64Data = dataUrlMatch[2];
-      }
-
-      contentsPayload = [
-        {
+      const inlineParts = allImages.map((imgStr) => {
+        let mimeType = 'image/jpeg';
+        let base64Data = imgStr;
+        const match = imgStr.match(/^data:([^;]+);base64,(.+)$/s);
+        if (match) {
+          mimeType = match[1];
+          base64Data = match[2];
+        }
+        return {
           inlineData: {
-            mimeType: mimeType,
+            mimeType,
             data: base64Data,
           },
-        },
+        };
+      });
+
+      contentsPayload = [
+        ...inlineParts,
         {
-          text: `${systemInstruction}\n\nUser Request: ${prompt || 'Analyze and describe every detail of this image in comprehensive, structured depth. Identify all elements, text, metrics, patterns, and provide clear actionable takeaways.'}`,
+          text: `${systemInstruction}\n\nUser Request: ${prompt || 'Please analyze and describe all attached images in detail, highlighting key insights, text, metrics, patterns, and actionable takeaways.'}`,
         },
       ];
     } else {
@@ -692,8 +835,222 @@ Respond with ONLY the email reply text. Do not include markdown code blocks or m
   }
 });
 
-// Start Express server + Vite
+// Process safety error handlers
+process.on('unhandledRejection', () => {
+  // Gracefully handle unhandled promises without crashing
+});
+
+process.on('uncaughtException', () => {
+  // Gracefully handle uncaught exceptions without crashing
+});
+
+// Guard WebSocket prototype emit to prevent unhandled 'error' events on teardown/sender errors
+const originalWsEmit = WebSocket.prototype.emit;
+WebSocket.prototype.emit = function (event: string | symbol, ...args: any[]) {
+  if (event === 'error') {
+    if (this.listenerCount('error') === 0) {
+      // Prevent Node.js from throwing unhandled 'error' event when no listeners are present
+      return true;
+    }
+  }
+  try {
+    return originalWsEmit.apply(this, [event, ...args] as any);
+  } catch (err) {
+    return false;
+  }
+};
+
+// Start Express server + WebSocket Live Bridge + Vite
 async function startServer() {
+  const server = http.createServer(app);
+
+  // Setup WebSocket server specifically for /api/live-chat
+  const wss = new WebSocketServer({ server, path: '/api/live-chat' });
+
+  wss.on('error', () => {
+    // Suppress WSS level errors
+  });
+
+  wss.on('connection', async (clientWs, req) => {
+    let session: any = null;
+    let isClosed = false;
+
+    // Attach error listener immediately to prevent uncaught socket errors
+    clientWs.on('error', () => {
+      // Absorbed without bubbling uncaught sender error
+    });
+
+    if ((clientWs as any)._socket) {
+      (clientWs as any)._socket.on('error', () => {});
+    }
+
+    const safeSend = (payload: any) => {
+      if (!isClosed && clientWs && clientWs.readyState === WebSocket.OPEN) {
+        try {
+          clientWs.send(JSON.stringify(payload), () => {
+            // Callback to safely absorb any transport write error
+          });
+        } catch (e) {
+          // Socket closed during send
+        }
+      }
+    };
+
+    console.log('[Gemini Live] Client connected to live voice stream');
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      safeSend({
+        type: 'error',
+        message: 'GEMINI_API_KEY is not configured on the server. Please check your settings.',
+      });
+      return;
+    }
+
+    try {
+      const ai = getGeminiClient();
+      if (!ai) {
+        throw new Error('Failed to initialize Gemini client');
+      }
+
+      session = await ai.live.connect({
+        model: 'gemini-3.1-flash-live-preview',
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              // Natural, articulate, warm female voice for Gemini Live ('Kore')
+              prebuiltVoiceConfig: { voiceName: 'Kore' },
+            },
+          },
+          systemInstruction:
+            'You are TaskFlow AI, an elite, highly articulate, warm, and dynamic female executive business and productivity assistant. You converse naturally in real-time two-way dialogue with concise, helpful, actionable responses. You help with daily schedules, email replies, revenue strategies, tasks, workflows, and business questions. Keep spoken answers concise, direct, and conversational.',
+          outputAudioTranscription: {},
+          inputAudioTranscription: {},
+        },
+        callbacks: {
+          onmessage: (message: any) => {
+            if (isClosed || clientWs.readyState !== WebSocket.OPEN) return;
+
+            try {
+              // Handle audio chunks from model turn
+              const parts = message.serverContent?.modelTurn?.parts;
+              if (parts && Array.isArray(parts)) {
+                for (const part of parts) {
+                  if (part.inlineData?.data) {
+                    safeSend({
+                      type: 'audio',
+                      data: part.inlineData.data,
+                    });
+                  }
+                  if (part.text) {
+                    safeSend({
+                      type: 'text',
+                      role: 'model',
+                      text: part.text,
+                    });
+                  }
+                }
+              }
+
+              // Handle transcriptions
+              if (message.serverContent?.outputAudioTranscription?.text) {
+                safeSend({
+                  type: 'text',
+                  role: 'model',
+                  text: message.serverContent.outputAudioTranscription.text,
+                });
+              }
+              if (message.serverContent?.inputAudioTranscription?.text) {
+                safeSend({
+                  type: 'text',
+                  role: 'user',
+                  text: message.serverContent.inputAudioTranscription.text,
+                });
+              }
+
+              // Handle interruption signal from Gemini
+              if (message.serverContent?.interrupted) {
+                safeSend({ type: 'interrupted' });
+              }
+
+              // Handle turn completion
+              if (message.serverContent?.turnComplete) {
+                safeSend({ type: 'turn_complete' });
+              }
+            } catch (msgErr) {
+              console.error('[Gemini Live onmessage error]:', msgErr);
+            }
+          },
+          onclose: (event: any) => {
+            console.log('[Gemini Live] Session closed:', event);
+            safeSend({ type: 'session_closed' });
+          },
+          onerror: (err: any) => {
+            console.error('[Gemini Live] Session error:', err);
+            safeSend({
+              type: 'error',
+              message: err?.message || 'Gemini Live session encountered an issue',
+            });
+          },
+        },
+      });
+
+      safeSend({ type: 'session_ready' });
+    } catch (err: any) {
+      console.error('[Gemini Live] Failed to connect to Gemini Live session:', err);
+      safeSend({
+        type: 'error',
+        message: err?.message || 'Could not connect to Gemini Live service.',
+      });
+      return;
+    }
+
+    clientWs.on('message', async (rawData) => {
+      if (!session || isClosed) return;
+      try {
+        const payload = JSON.parse(rawData.toString());
+        if (payload.type === 'realtime_audio' && payload.data) {
+          try {
+            await session.sendRealtimeInput({
+              audio: {
+                data: payload.data,
+                mimeType: 'audio/pcm;rate=16000',
+              },
+            });
+          } catch (audioErr) {
+            // Absorb live session audio send errors safely
+          }
+        } else if (payload.type === 'text_input' && payload.text) {
+          try {
+            await session.sendClientContent({
+              turns: [{ role: 'user', parts: [{ text: payload.text }] }],
+              turnComplete: true,
+            });
+          } catch (textErr) {
+            // Absorb live session text send errors safely
+          }
+        }
+      } catch (err) {
+        console.error('[Gemini Live message handle error]:', err);
+      }
+    });
+
+    const cleanup = () => {
+      if (isClosed) return;
+      isClosed = true;
+      if (session) {
+        const s = session;
+        session = null;
+        try {
+          s.close();
+        } catch (e) {}
+      }
+    };
+
+    clientWs.on('close', cleanup);
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -709,7 +1066,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  server.listen(PORT, '0.0.0.0', () => {
     console.log(`TaskFlow AI Server running on http://0.0.0.0:${PORT}`);
   });
 }

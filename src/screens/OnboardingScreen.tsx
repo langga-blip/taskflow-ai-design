@@ -45,8 +45,8 @@ export const OnboardingScreen: React.FC = () => {
   const [googleAccountEmail, setGoogleAccountEmail] = useState('');
   const [isSigningInGoogle, setIsSigningInGoogle] = useState(false);
 
-  const [userName, setUserName] = useState(userProfile.userName || 'Alex Rivera');
-  const [workEmail, setWorkEmail] = useState(userProfile.userEmail || '');
+  const [userName, setUserName] = useState(userProfile.isOnboarded ? userProfile.userName : '');
+  const [workEmail, setWorkEmail] = useState(userProfile.isOnboarded ? userProfile.userEmail : '');
   const [businessName, setBusinessName] = useState(userProfile.businessName || 'Apex Scale Agency');
   const [industry, setIndustry] = useState(userProfile.industry || 'Marketing Agency / Consulting');
   const [goal1, setGoal1] = useState(userProfile.goal1 || 'Reach $10,000 Monthly Recurring Revenue');
@@ -61,7 +61,7 @@ export const OnboardingScreen: React.FC = () => {
     return getCountryByName(userProfile.country || 'United States');
   });
 
-  const [phoneDigits, setPhoneDigits] = useState('801 234 5678');
+  const [phoneDigits, setPhoneDigits] = useState('');
   // Real password state so toggling eye revealer actually shows the plain text!
   const [password, setPassword] = useState('TaskFlowPass2026!');
   const [showPassword, setShowPassword] = useState(false);
@@ -80,7 +80,7 @@ export const OnboardingScreen: React.FC = () => {
       const email = res.user.email || 'user@gmail.com';
 
       // Check if Google email is already registered
-      if (isEmailRegistered(email, userProfile.userEmail)) {
+      if (isEmailRegistered(email)) {
         setIsDuplicateError(true);
         setDuplicateField('email');
         setDuplicateErrorMsg(`Account for ${email} already exists. Redirecting you to Sign In...`);
@@ -161,7 +161,7 @@ export const OnboardingScreen: React.FC = () => {
       if (!businessName.trim()) return;
 
       const cleanEmail = workEmail.trim().toLowerCase();
-      if (cleanEmail && isEmailRegistered(cleanEmail, userProfile.userEmail)) {
+      if (cleanEmail && isEmailRegistered(cleanEmail)) {
         setIsDuplicateError(true);
         setDuplicateField('email');
         setDuplicateErrorMsg(`Account for ${cleanEmail} already exists. Redirecting you to Sign In...`);
@@ -187,10 +187,7 @@ export const OnboardingScreen: React.FC = () => {
       if (!password || password.length < 6) return;
 
       const fullPhone = `${selectedCountry.dialCode} ${phoneDigits.trim()}`;
-      if (
-        isPhoneRegistered(fullPhone, userProfile.phoneNumber) ||
-        isPhoneRegistered(phoneDigits, userProfile.phoneNumber)
-      ) {
+      if (phoneDigits.trim() && isPhoneRegistered(fullPhone)) {
         setIsDuplicateError(true);
         setDuplicateField('phone');
         setDuplicateErrorMsg(`Phone number ${fullPhone} is already registered. Redirecting you to Sign In...`);
@@ -213,7 +210,7 @@ export const OnboardingScreen: React.FC = () => {
 
       // Re-verify email as well
       const cleanEmail = workEmail.trim().toLowerCase();
-      if (cleanEmail && isEmailRegistered(cleanEmail, userProfile.userEmail)) {
+      if (cleanEmail && isEmailRegistered(cleanEmail)) {
         setIsDuplicateError(true);
         setDuplicateField('email');
         setDuplicateErrorMsg(`Account for ${cleanEmail} already exists. Redirecting you to Sign In...`);
@@ -245,7 +242,7 @@ export const OnboardingScreen: React.FC = () => {
     const cleanEmail = workEmail.trim().toLowerCase();
 
     // Check again before final save
-    if (cleanEmail && isEmailRegistered(cleanEmail, userProfile.userEmail)) {
+    if (cleanEmail && isEmailRegistered(cleanEmail)) {
       setIsDuplicateError(true);
       setDuplicateField('email');
       setDuplicateErrorMsg(`Account for ${cleanEmail} already exists. Redirecting you to Sign In...`);
@@ -258,10 +255,7 @@ export const OnboardingScreen: React.FC = () => {
       return;
     }
 
-    if (
-      isPhoneRegistered(fullPhone, userProfile.phoneNumber) ||
-      isPhoneRegistered(phoneDigits, userProfile.phoneNumber)
-    ) {
+    if (phoneDigits.trim() && isPhoneRegistered(fullPhone)) {
       setIsDuplicateError(true);
       setDuplicateField('phone');
       setDuplicateErrorMsg(`Phone number ${fullPhone} is already registered. Redirecting you to Sign In...`);

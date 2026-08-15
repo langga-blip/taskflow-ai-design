@@ -1,88 +1,132 @@
 // Speech & Audio Utilities for Task Flow AI
-// Supports Speech-To-Text (Voice Translation) & Amazon Alexa Voice Synthesis
+// Real-Time Speech Recognition & Task Flow AI Voice Synthesis
 
-export const speakWithAlexaVoice = (text: string) => {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+let activeSpeechUtterances: SpeechSynthesisUtterance[] = [];
 
-  try {
-    window.speechSynthesis.cancel(); // Stop any active speech
-
-    // Clean text of markdown formatting symbols (**bold**, # headers, bullet lists, etc.)
-    const cleanText = text
-      .replace(/[*#_`~]/g, '')
-      .replace(/\[.*?\]\(.*?\)/g, '') // remove markdown links
-      .replace(/https?:\/\/\S+/g, '') // remove raw urls
-      .trim();
-
-    if (!cleanText) return;
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.rate = 0.98; // Alexa's clear, rhythmic conversational cadence
-    utterance.pitch = 1.05; // Alexa's calm, confident AI tone
-
-    const selectAlexaVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (!voices || voices.length === 0) return;
-
-      // Priority list for Amazon Alexa voice style across platforms
-      const alexaVoiceNames = [
-        'Alexa',
-        'Amazon',
-        'Google US English',
-        'Samantha',
-        'Microsoft Aria',
-        'Microsoft Zira',
-        'Jenny',
-        'Victoria',
-        'Karen',
-        'Google UK English Female',
-        'Moira',
-        'Natural'
-      ];
-
-      let selected = voices.find((v) =>
-        alexaVoiceNames.some((name) => v.name.toLowerCase().includes(name.toLowerCase())) &&
-        (v.lang.startsWith('en') || !v.lang)
-      );
-
-      if (!selected) {
-        selected = voices.find(
-          (v) =>
-            v.lang.startsWith('en') &&
-            (v.name.toLowerCase().includes('female') ||
-              v.name.toLowerCase().includes('aria') ||
-              v.name.toLowerCase().includes('zira') ||
-              v.name.toLowerCase().includes('samantha'))
-        );
-      }
-
-      if (!selected) {
-        selected = voices.find((v) => v.lang.startsWith('en'));
-      }
-
-      if (selected) {
-        utterance.voice = selected;
-      }
-    };
-
-    selectAlexaVoice();
-
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length === 0) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        selectAlexaVoice();
-        window.speechSynthesis.speak(utterance);
-      };
-    } else {
-      window.speechSynthesis.speak(utterance);
-    }
-  } catch (err) {
-    console.warn('Alexa voice synthesis notice:', err);
+/**
+ * Stop any ongoing speech synthesis
+ */
+export const stopAllSpeech = () => {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel();
+      activeSpeechUtterances = [];
+    } catch (e) {}
   }
 };
 
-// Legacy alias for backwards compatibility
-export const speakWithAiGirlVoice = speakWithAlexaVoice;
+/**
+ * Clean markdown and technical syntax for natural conversational speech
+ */
+export const cleanTextForSpeech = (text: string): string => {
+  return text
+    .replace(/[*#_`~]/g, '') // remove markdown symbols
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1') // preserve markdown link text
+    .replace(/https?:\/\/\S+/g, '') // remove raw urls
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '') // remove emojis
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+/**
+ * Speak using Task Flow AI voice styling (warm, articulate, expressive, natural cadence)
+ */
+export const speakWithTaskFlowAiVoice = (
+  text: string,
+  options?: { onStart?: () => void; onEnd?: () => void }
+) => {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+  try {
+    stopAllSpeech();
+
+    const cleanText = cleanTextForSpeech(text);
+    if (!cleanText) return;
+
+    // Split text into natural conversational chunks if it's long, to avoid speech engine truncation
+    const sentenceChunks = cleanText.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleanText];
+    const chunks = sentenceChunks.map((s) => s.trim()).filter((s) => s.length > 0);
+
+    if (chunks.length === 0) return;
+
+    // Select the best available Task Flow AI female voice
+    const getTaskFlowAiVoice = (): SpeechSynthesisVoice | null => {
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) return null;
+
+      // Priority list for natural female voice equivalents across OS/browsers
+      const preferredNames = [
+        'juniper',
+        'sky',
+        'breeze',
+        'aria',
+        'jenny',
+        'samantha',
+        'victoria',
+        'karen',
+        'moira',
+        'tessa',
+        'google us english female',
+        'google us english',
+        'google uk english female',
+        'zira',
+        'natural',
+        'female',
+      ];
+
+      for (const name of preferredNames) {
+        const found = voices.find(
+          (v) =>
+            v.name.toLowerCase().includes(name) &&
+            (v.lang.startsWith('en') || !v.lang)
+        );
+        if (found) return found;
+      }
+
+      // Fallback: any female or english voice
+      return voices.find((v) => v.lang.startsWith('en')) || voices[0] || null;
+    };
+
+    const targetVoice = getTaskFlowAiVoice();
+
+    chunks.forEach((chunk, index) => {
+      const utterance = new SpeechSynthesisUtterance(chunk);
+      utterance.rate = 1.02; // Warm conversational flow
+      utterance.pitch = 1.08; // Melodic, clear Task Flow AI voice tone
+
+      if (targetVoice) {
+        utterance.voice = targetVoice;
+      }
+
+      if (index === 0 && options?.onStart) {
+        utterance.onstart = options.onStart;
+      }
+
+      if (index === chunks.length - 1 && options?.onEnd) {
+        utterance.onend = () => {
+          activeSpeechUtterances = [];
+          options.onEnd?.();
+        };
+      }
+
+      utterance.onerror = () => {
+        activeSpeechUtterances = [];
+        options?.onEnd?.();
+      };
+
+      activeSpeechUtterances.push(utterance);
+      window.speechSynthesis.speak(utterance);
+    });
+  } catch (err) {
+    console.warn('Task Flow AI voice synthesis notice:', err);
+    options?.onEnd?.();
+  }
+};
+
+// Aliases for compatibility
+export const speakWithGeminiVoice = speakWithTaskFlowAiVoice;
+export const speakWithAlexaVoice = speakWithTaskFlowAiVoice;
+export const speakWithAiGirlVoice = speakWithTaskFlowAiVoice;
 
 export interface VoiceRecognizerController {
   start: () => Promise<boolean>;

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { Bot, Sparkles, Mic, MicOff, Volume2, X, Maximize2, Layers, ExternalLink, ShieldCheck, Mail } from 'lucide-react';
 import { askAssistantApi } from '../services/api';
-import { createVoiceRecognizer, speakWithAlexaVoice, VoiceRecognizerController } from '../utils/speechUtils';
+import { createVoiceRecognizer, speakWithTaskFlowAiVoice, VoiceRecognizerController } from '../utils/speechUtils';
 import { autoCorrectText } from '../utils/autoCorrect';
 
 export const FloatingAssistantOverlay: React.FC = () => {
@@ -17,12 +17,15 @@ export const FloatingAssistantOverlay: React.FC = () => {
   const [isThinking, setIsThinking] = useState(false);
   const [isOverlayModeActive, setIsOverlayModeActive] = useState(false);
   const [pipWindowRef, setPipWindowRef] = useState<Window | null>(null);
+  const [isLongPressing, setIsLongPressing] = useState(false);
 
   // Latest email notification sent to registered email
   const latestEmailNotif = notifications.find((n) => n.category === 'EMAIL');
 
   const controllerRef = useRef<VoiceRecognizerController | null>(null);
   const currentTranscriptRef = useRef<string>('');
+  const longPressTimerRef = useRef<any>(null);
+  const isLongPressTriggeredRef = useRef(false);
 
   useEffect(() => {
     const handleLaunchPip = () => {
@@ -35,9 +38,9 @@ export const FloatingAssistantOverlay: React.FC = () => {
   // Hide main button when already on full AI Assistant screen
   const isAssistantScreen = currentScreen === 'assistant';
 
-  // Speech synthesis speak helper using Amazon Alexa voice
+  // Speech synthesis speak helper using Task Flow AI voice
   const speakText = (text: string) => {
-    speakWithAlexaVoice(text);
+    speakWithTaskFlowAiVoice(text);
   };
 
   // Process voice input through AI
@@ -345,6 +348,40 @@ export const FloatingAssistantOverlay: React.FC = () => {
     }
   };
 
+  // Long press handling logic for the AI Assistant trigger:
+  // Short click -> Open AI Assistant screen
+  // Long press (~400ms) -> Show "Display Over Other Apps" panel
+  const handlePointerDown = () => {
+    isLongPressTriggeredRef.current = false;
+    setIsLongPressing(true);
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressTriggeredRef.current = true;
+      setIsLongPressing(false);
+      setIsOpen(true); // Open the Display Over Other Apps popover
+    }, 400);
+  };
+
+  const handlePointerUp = () => {
+    setIsLongPressing(false);
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    if (!isLongPressTriggeredRef.current) {
+      // Regular click: open AI Assistant Screen
+      setCurrentScreen('assistant');
+    }
+  };
+
+  const handlePointerLeave = () => {
+    setIsLongPressing(false);
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
   return (
     <>
       {/* Floating Assistant Orb (visible on all screens except full assistant view) */}
@@ -366,7 +403,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="font-bold text-xs flex items-center gap-1">
-                      Task Flow AI <Sparkles className="w-3 h-3 text-[#06B6D4]" />
+                      Task Flow AI Assistant <Sparkles className="w-3 h-3 text-[#06B6D4]" />
                     </h4>
                     <span className="text-[10px] text-[#00E676] font-semibold">
                       {isOverlayModeActive ? 'Display Over Other Apps Active' : '24/7 Overlay Assistant'}
@@ -421,7 +458,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
                 }`}
               >
                 <div className="flex items-center justify-between text-[10px] text-slate-400 font-semibold">
-                  <span>TRANSCRIPTION / RESPONSE</span>
+                  <span>TASK FLOW AI VOICE RESPONSE</span>
                   {isThinking && (
                     <div className="flex items-center gap-1 text-[#06B6D4]">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] ai-typing-dot-1" />
@@ -452,7 +489,7 @@ export const FloatingAssistantOverlay: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      <Mic className="w-4 h-4" /> Speak to AI Assistant
+                      <Mic className="w-4 h-4" /> Speak in Real-Time (Task Flow AI Voice)
                     </>
                   )}
                 </button>
@@ -474,20 +511,34 @@ export const FloatingAssistantOverlay: React.FC = () => {
             </div>
           )}
 
-          {/* Floating Orb Icon */}
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="group relative flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-tr from-[#7C3AED] via-[#8B5CF6] to-[#06B6D4] text-white shadow-[0_0_25px_rgba(124,58,237,0.6)] hover:shadow-[0_0_35px_rgba(6,182,212,0.8)] cursor-pointer touch-manipulation select-none active:opacity-80"
-            title="Task Flow AI Floating Assistant"
-          >
-            <Bot className="w-7 h-7" />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#00E676] rounded-full border-2 border-[#0A0C14] animate-pulse" />
+          {/* Floating Orb Icon: Click opens AI screen, Long Tap shows Display Over Other Apps */}
+          <div className="relative group">
+            <button
+              onPointerDown={handlePointerDown}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerLeave}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setIsOpen(true);
+              }}
+              className={`relative flex items-center justify-center w-14 h-14 rounded-full text-white shadow-[0_0_25px_rgba(124,58,237,0.6)] hover:shadow-[0_0_35px_rgba(6,182,212,0.8)] cursor-pointer touch-manipulation select-none transition-transform duration-200 ${
+                isLongPressing
+                  ? 'scale-110 ring-4 ring-[#06B6D4] bg-gradient-to-tr from-[#06B6D4] to-[#7C3AED]'
+                  : 'bg-gradient-to-tr from-[#7C3AED] via-[#8B5CF6] to-[#06B6D4] hover:scale-105 active:scale-95'
+              }`}
+              title="Click to Open AI Assistant Screen • Long-Press to Display Over Other Apps"
+            >
+              <Bot className="w-7 h-7" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#00E676] rounded-full border-2 border-[#0A0C14] animate-pulse" />
+            </button>
+
             {!isOpen && (
-              <div className="absolute right-16 hidden group-hover:flex items-center gap-1 bg-[#131726] border border-[#7C3AED] px-3 py-1.5 rounded-xl text-xs font-bold text-white shadow-xl whitespace-nowrap">
-                <Sparkles className="w-3.5 h-3.5 text-[#06B6D4]" /> Display Over Other Apps
+              <div className="absolute right-16 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1.5 bg-[#131726]/95 border border-[#7C3AED] px-3 py-1.5 rounded-xl text-[11px] font-bold text-white shadow-xl whitespace-nowrap pointer-events-none">
+                <Sparkles className="w-3.5 h-3.5 text-[#06B6D4]" />
+                <span>Click: Open AI • Hold: Display Over Apps</span>
               </div>
             )}
-          </button>
+          </div>
         </div>
       )}
     </>

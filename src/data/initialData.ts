@@ -25,15 +25,15 @@ export const CURRENCY_OPTIONS: CurrencyOption[] = [
 ];
 
 export const INITIAL_USER_PROFILE: UserProfile = {
-  userName: 'Alex Rivera',
-  userEmail: 'alex@apexscale.com',
-  phoneNumber: '+1 (555) 234-8901',
-  businessName: 'Apex Scale Agency',
+  userName: '',
+  userEmail: '',
+  phoneNumber: '',
+  businessName: '',
   industry: 'Marketing Agency & Consulting',
   goal1: 'Reach $10,000 Monthly Recurring Revenue',
   goal2: 'Automate Client Onboarding & Reporting',
   goal3: 'Launch Cold Email Outreach Campaign',
-  currentMonthlyRevenue: 3450.0,
+  currentMonthlyRevenue: 0,
   monthlyRevenueGoal: 10000.0,
   currencyCode: 'USD',
   currencySymbol: '$',
@@ -43,9 +43,11 @@ export const INITIAL_USER_PROFILE: UserProfile = {
   themeMode: 'Dark',
   gender: 'Prefer not to say',
   isSubscribed: false,
+  subscriptionDuration: undefined,
   subscriptionExpiryDate: 'Free Plan',
   subscriptionTimestampMs: 0,
-  isOnboarded: true,
+  subscriptionExpiryMs: 0,
+  isOnboarded: false,
 };
 
 export const INITIAL_TASKS: Task[] = [
