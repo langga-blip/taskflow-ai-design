@@ -31,9 +31,21 @@ jobs:
 
       - name: Prepare env for secrets plugin
         run: |
-          if [ ! -f .env ]; then
-            cp .env.example .env
-          fi
+          # Secrets plugin injects these into BuildConfig.
+          # Empty values must be quoted strings or Java becomes invalid (e.g. KEY = ;).
+          cat > .env << 'EOF'
+          GEMINI_API_KEY=""
+          OPENAI_API_KEY=""
+          DEEPSEEK_API_KEY=""
+          SMTP_HOST=""
+          SMTP_PORT="587"
+          SMTP_USER=""
+          SMTP_PASS=""
+          SMTP_FROM="TaskFlow AI <no-reply@taskflow.ai>"
+          TWILIO_ACCOUNT_SID=""
+          TWILIO_AUTH_TOKEN=""
+          TWILIO_PHONE_NUMBER=""
+          EOF
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
