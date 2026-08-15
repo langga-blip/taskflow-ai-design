@@ -7,8 +7,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Crown
-import androidx.compose.material.icons.filled.ShieldCheck
+import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,7 +48,7 @@ fun SubscriptionScreen(viewModel: TaskFlowViewModel) {
         Spacer(modifier = Modifier.height(20.dp))
 
         Icon(
-            imageVector = Icons.Default.Crown,
+            imageVector = Icons.Default.WorkspacePremium,
             contentDescription = null,
             tint = AmberGlow,
             modifier = Modifier.size(54.dp)
@@ -150,7 +150,7 @@ fun SubscriptionScreen(viewModel: TaskFlowViewModel) {
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.ShieldCheck, contentDescription = null, tint = EmeraldGreen)
+                                Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = EmeraldGreen)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "Payment Success & Receipt Dispatched!",
@@ -193,7 +193,7 @@ fun SubscriptionScreen(viewModel: TaskFlowViewModel) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Processing ₦20,000 Payment...", color = DeepDarkBg, fontWeight = FontWeight.Bold)
                         } else {
-                            Icon(Icons.Default.Crown, contentDescription = null, tint = DeepDarkBg)
+                            Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = DeepDarkBg)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "Activate Pro Pass (₦20,000 / 3 Months)",

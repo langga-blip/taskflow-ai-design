@@ -3,7 +3,6 @@ package com.aistudio.taskflowai.app.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -36,7 +35,6 @@ fun DashboardScreen(viewModel: TaskFlowViewModel) {
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        // Top Welcome Bar
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -66,7 +64,7 @@ fun DashboardScreen(viewModel: TaskFlowViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = if (userProfile.isSubscribed) Icons.Default.Crown else Icons.Default.AutoAwesome,
+                        imageVector = if (userProfile.isSubscribed) Icons.Default.WorkspacePremium else Icons.Default.AutoAwesome,
                         contentDescription = null,
                         tint = if (userProfile.isSubscribed) AmberGlow else NeonCyan,
                         modifier = Modifier.size(14.dp)
@@ -84,7 +82,6 @@ fun DashboardScreen(viewModel: TaskFlowViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Executive Metrics Grid
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -116,7 +113,6 @@ fun DashboardScreen(viewModel: TaskFlowViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Quick AI Action Shortcuts
         Text(
             text = "AI Quick Actions",
             color = TextPrimary,
@@ -155,7 +151,6 @@ fun DashboardScreen(viewModel: TaskFlowViewModel) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Today's Focus Tasks
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -212,7 +207,6 @@ fun DashboardScreen(viewModel: TaskFlowViewModel) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // AI Optimized Schedule Block
         Text(
             text = "AI Strategy Time Blocks",
             color = TextPrimary,
