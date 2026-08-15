@@ -29,11 +29,18 @@ jobs:
       - name: Grant execute permission
         run: chmod +x gradlew
 
+      - name: Prepare env for secrets plugin
+        run: |
+          if [ ! -f .env ]; then
+            cp .env.example .env
+          fi
+
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: TaskFlowAI-Debug-APK
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn

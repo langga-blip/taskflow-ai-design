@@ -19,18 +19,11 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    signingConfigs {
-        create("debugConfig") {
-            storeFile = file("${rootDir}/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
-    }
-
+    // Use the default Android debug keystore (present on CI and local SDK installs).
+    // Do not require a project-root debug.keystore file.
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("debugConfig")
+            // default debug signing
         }
         release {
             isMinifyEnabled = false
@@ -42,8 +35,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
