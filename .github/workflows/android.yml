@@ -17,6 +17,28 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install web dependencies
+        run: npm ci || npm install
+
+      - name: Build React (AI Studio) app for WebView
+        run: npx vite build
+
+      - name: Copy web build into Android assets
+        run: |
+          mkdir -p app/src/main/assets/www
+          cp -R dist/. app/src/main/assets/www/
+          # Ensure index.html is present
+          test -f app/src/main/assets/www/index.html
+          echo "Web assets packaged:"
+          du -sh app/src/main/assets/www
+          find app/src/main/assets/www -type f | head -40
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -33,7 +55,6 @@ jobs:
         run: |
           # Secrets Gradle plugin injects every key into BuildConfig as a String.
           # Empty values produce invalid Java (KEY = ;). Use non-empty placeholders on CI.
-          # No leading spaces — properties must be flush-left.
           cat > .env << 'EOF'
           GEMINI_API_KEY=placeholder
           OPENAI_API_KEY=placeholder
@@ -47,7 +68,6 @@ jobs:
           TWILIO_AUTH_TOKEN=placeholder
           TWILIO_PHONE_NUMBER=placeholder
           EOF
-          # Strip accidental leading whitespace from heredoc indentation
           sed -i 's/^[[:space:]]*//' .env
 
       - name: Build Debug APK

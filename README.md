@@ -8,15 +8,31 @@ This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/bcd5e76b-c5c4-4735-bc71-ca74e5ffeed5
 
-## Run Locally
+## Android APK (matches AI Studio preview)
 
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
+The Android app is a **WebView shell** that loads the **full React UI** from Google AI Studio (not the old simplified Compose screens).
 
+CI builds the Vite app into `app/src/main/assets/www/` and packages it into the APK. The APK will be larger (often well over 40 MB once assets are included) because it contains the real product UI.
 
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
-3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device
-7. If you have already published your app in AI Studio, please [request upload key reset](https://support.google.com/googleplay/android-developer/answer/9842756#zippy=%2Crequest-an-upload-key-reset) in Google Play Console.
+**Local Android build:**
+
+1. `npm install`
+2. `npx vite build`
+3. `mkdir -p app/src/main/assets/www && cp -R dist/. app/src/main/assets/www/`
+4. Open in Android Studio and run, or `./gradlew assembleDebug`
+
+**Note:** `/api/*` calls need your backend (`npm run dev` / deployed server). Without a server, the UI still loads fully; AI endpoints use built-in fallbacks.
+
+## Run web app locally
+
+**Prerequisites:** Node.js 20+
+
+1. `npm install`
+2. Create `.env` with `GEMINI_API_KEY=...` (see `.env.example`)
+3. `npm run dev` — opens the same experience as AI Studio
+
+## Run in Android Studio only
+
+1. Open this project in Android Studio
+2. Ensure web assets exist under `app/src/main/assets/www/` (run the local Android build steps above if empty)
+3. Run on an emulator or device
