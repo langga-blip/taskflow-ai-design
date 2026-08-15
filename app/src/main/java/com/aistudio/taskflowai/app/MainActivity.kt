@@ -2,9 +2,14 @@ package com.aistudio.taskflowai.app
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.webkit.PermissionRequest
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -17,11 +22,17 @@ import androidx.core.content.ContextCompat
 /**
  * Hosts the full TaskFlow AI (Google AI Studio) React app in a WebView.
  * The Vite build is copied to assets/www by CI (or locally via npm run build).
+ *
+ * Supports:
+ * - Mic / camera permission prompts from the page
+ * - HTML file input / image uploader (onShowFileChooser)
+ * - SPA navigation kept inside the WebView
  */
 class MainActivity : ComponentActivity() {
 
     private var webView: WebView? = null
     private var pendingPermissionRequest: PermissionRequest? = null
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -35,6 +46,36 @@ class MainActivity : ComponentActivity() {
             }
             pendingPermissionRequest = null
         }
+    }
+
+    private val fileChooserLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val callback = filePathCallback
+        filePathCallback = null
+        if (callback == null) return@registerForActivityResult
+
+        if (result.resultCode != Activity.RESULT_OK || result.data == null) {
+            callback.onReceiveValue(null)
+            return@registerForActivityResult
+        }
+
+        val data = result.data
+        val uris = mutableListOf<Uri>()
+
+        // Multi-select (clip data)
+        data?.clipData?.let { clip ->
+            for (i in 0 until clip.itemCount) {
+                clip.getItemAt(i)?.uri?.let { uris.add(it) }
+            }
+        }
+
+        // Single file
+        if (uris.isEmpty()) {
+            data?.data?.let { uris.add(it) }
+        }
+
+        callback.onReceiveValue(if (uris.isEmpty()) null else uris.toTypedArray())
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -101,6 +142,61 @@ class MainActivity : ComponentActivity() {
                     } else {
                         pendingPermissionRequest = request
                         permissionLauncher.launch(missing.toTypedArray())
+                    }
+                }
+
+                /**
+                 * Required for <input type="file"> image uploader in the AI Assistant screen.
+                 * Without this, the file picker never opens in Android WebView.
+                 */
+                override fun onShowFileChooser(
+                    webView: WebView?,
+                    filePathCallback: ValueCallback<Array<Uri>>?,
+                    fileChooserParams: FileChooserParams?
+                ): Boolean {
+                    // Cancel any previous pending callback
+                    this@MainActivity.filePathCallback?.onReceiveValue(null)
+                    this@MainActivity.filePathCallback = filePathCallback
+
+                    val intent = try {
+                        fileChooserParams?.createIntent() ?: Intent(Intent.ACTION_GET_CONTENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "image/*"
+                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                        }
+                    } catch (e: Exception) {
+                        Intent(Intent.ACTION_GET_CONTENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "image/*"
+                            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                        }
+                    }
+
+                    // Prefer image/* when accept types are image-related
+                    val acceptTypes = fileChooserParams?.acceptTypes
+                    if (acceptTypes != null && acceptTypes.isNotEmpty() && acceptTypes[0].isNotBlank()) {
+                        if (acceptTypes.size == 1) {
+                            intent.type = acceptTypes[0]
+                        } else {
+                            intent.type = "*/*"
+                            intent.putExtra(Intent.EXTRA_MIME_TYPES, acceptTypes)
+                        }
+                    } else {
+                        intent.type = "image/*"
+                    }
+
+                    intent.putExtra(
+                        Intent.EXTRA_ALLOW_MULTIPLE,
+                        fileChooserParams?.mode == FileChooserParams.MODE_OPEN_MULTIPLE
+                    )
+
+                    return try {
+                        fileChooserLauncher.launch(Intent.createChooser(intent, "Select image(s)"))
+                        true
+                    } catch (e: Exception) {
+                        this@MainActivity.filePathCallback = null
+                        filePathCallback?.onReceiveValue(null)
+                        false
                     }
                 }
             }
