@@ -1,16 +1,12 @@
 // Utility for managing registered account emails and phone numbers for duplicate validation & redirect flows
 
-// Demo accounts that exist by default for preview sign-in + common prefilled values
+// Demo accounts that exist by default for preview sign-in
 const DEFAULT_EMAILS = [
   'demo@taskflow.ai',
-  'alex@apexscale.com',
-  'alex.rivera@gmail.com',
-  'executive.user@gmail.com',
 ];
 
 const DEFAULT_PHONES = [
   '+1 555 019 0000',
-  '+234 801 234 5678',
 ];
 
 const normalizePhone = (phone: string): string => {
