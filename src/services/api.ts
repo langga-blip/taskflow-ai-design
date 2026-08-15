@@ -121,20 +121,34 @@ export async function askAssistantApi(
   const biz = profile?.businessName || 'Your Business';
   const symbol = profile?.currencySymbol || '$';
   const goal = (profile?.monthlyRevenueGoal !== undefined ? profile.monthlyRevenueGoal : 10000).toLocaleString();
+  const industry = profile?.industry || 'your industry';
 
   if (imageList.length > 0) {
     return `### Visual Analysis & Key Takeaways for **${biz}**\n\nHello ${name}! I inspected your ${imageList.length > 1 ? `${imageList.length} attached images` : 'attached image'}:\n\n• **Composition**: Identified all focal data points, structure, and text details across all assets.\n• **Insights**: Content directly maps to *"${rawPrompt || 'Image audit'}"*.\n• **Next Action**: Extracted takeaways have been logged to assist with your active tasks!`;
   }
 
   if (/^(hi|hello|hey|greetings|howdy|sup|yo)\b/i.test(p) || p === 'hi' || p === 'hello') {
-    return `### Hello ${name}! 👋\n\nI am your **24/7 AI Business Executive** for **${biz}**.\n\nHow can I help you today? I can answer questions, prioritize tasks, draft emails & proposals, or brainstorm growth strategies toward your **${symbol}${goal}** goal!`;
+    return `### Hello ${name}! 👋\n\nI am your **24/7 AI Business Executive** for **${biz}**.\n\nHow can I help you today? I can:\n- Prioritize today's tasks\n- Draft emails & proposals\n- Brainstorm growth ideas toward your **${symbol}${goal}** goal\n- Analyze revenue or operations\n\nJust tell me what you need!`;
   }
 
-  if (p.includes('draft') || p.includes('email') || p.includes('write')) {
-    return `### Drafted Message for **${biz}** ✉️\n\n**Subject**: Strategic Growth & Next Steps for [Client]\n\n**Hi [Client Name]**,\n\nI hope you're having a productive week.\n\nI wanted to follow up on our recent discussion regarding your growth initiatives. We've mapped out a high-impact roadmap designed to save your team 20+ hours weekly and accelerate delivery.\n\nLet me know if you have 10 minutes this week to align on next steps!\n\nBest,\n**${name}** | **${biz}**`;
+  if (p.includes('draft') || p.includes('email') || p.includes('write') || p.includes('message')) {
+    return `### Drafted Message for **${biz}** ✉️\n\n**Subject**: Strategic Growth & Next Steps\n\n**Hi [Client Name]**,\n\nI hope you're having a productive week.\n\nI wanted to follow up on our recent discussion regarding your growth initiatives in ${industry}. We've mapped out a high-impact roadmap designed to save your team 20+ hours weekly and accelerate delivery.\n\nLet me know if you have 10 minutes this week to align on next steps!\n\nBest,\n**${name}** | **${biz}**\n\n---\n*Tip: Copy and personalize the [Client Name] placeholder before sending.*`;
   }
 
-  return `### Insights & Recommendations for **${biz}** 💡\n\nHello ${name}! Regarding your inquiry:\n\n> *"${rawPrompt}"*\n\n1. **Core Assessment**: Addressing this will directly support streamlining operations and driving growth for **${biz}**.\n2. **Action Step**: Prioritize key sub-tasks in your TaskFlow Manager and set measurable deadlines.\n3. **Assistance**: Let me know if you would like me to draft an email, generate a checklist, or calculate projections!`;
+  if (p.includes('task') || p.includes('todo') || p.includes('plan') || p.includes('schedule') || p.includes('priority')) {
+    return `### Priority Action Plan for **${biz}** 📋\n\nBased on your goals and the ${symbol}${goal} monthly target:\n\n1. **High Impact (Today)**: Close or advance the top 2 open deals / proposals.\n2. **Pipeline**: Reach out to 5–10 new prospects in ${industry}.\n3. **Operations**: Automate one repetitive process (onboarding, follow-up, or reporting).\n4. **Review**: Block 20 minutes at end of day to log wins and blockers.\n\nWould you like me to turn any of these into concrete tasks in Task Manager?`;
+  }
+
+  if (p.includes('revenue') || p.includes('money') || p.includes('sales') || p.includes('income') || p.includes('profit')) {
+    return `### Revenue Insights for **${biz}** 💰\n\nToward your **${symbol}${goal}** goal:\n\n- Focus on high-ticket offers and faster close cycles.\n- Track conversion rate from lead → paid client weekly.\n- Identify the single biggest revenue leak (pricing, follow-up lag, or offer clarity).\n\nI can help draft a pricing page, follow-up sequence, or simple revenue dashboard view. What would be most useful right now?`;
+  }
+
+  if (p.includes('help') || p.includes('what can you') || p.includes('capabilities') || p.includes('features')) {
+    return `### How I Can Help You 🚀\n\nAs your AI executive for **${biz}**, I can:\n\n- Answer business questions in plain language\n- Draft emails, proposals, and outreach\n- Suggest daily / weekly priorities\n- Analyze tasks, revenue, and bottlenecks\n- Brainstorm marketing & sales ideas\n- Support voice mode (when mic is available)\n\nJust ask naturally — e.g. “Draft a follow-up email” or “What should I focus on today?”`;
+  }
+
+  // Generic rich fallback that still feels conversational
+  return `### Insights & Recommendations for **${biz}** 💡\n\nHello ${name}! Regarding:\n\n> *"${rawPrompt}"*\n\n1. **Core Assessment**: Addressing this supports streamlining operations and growth for **${biz}** in ${industry}.\n2. **Suggested Next Step**: Break it into 2–3 concrete actions and add the most important one to your Task Manager with a deadline.\n3. **How I Can Assist Further**:\n   - Draft an email or message\n   - Build a short checklist\n   - Estimate time / revenue impact\n   - Suggest priorities for the rest of the week\n\nWhat would you like me to do next?`;
 }
 
 export async function generateWeeklyReviewApi(
@@ -294,5 +308,3 @@ export async function suggestEmailReplyApi(
     };
   }
 }
-
-
