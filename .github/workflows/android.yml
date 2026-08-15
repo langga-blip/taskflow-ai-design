@@ -31,21 +31,24 @@ jobs:
 
       - name: Prepare env for secrets plugin
         run: |
-          # Secrets plugin injects these into BuildConfig.
-          # Empty values must be quoted strings or Java becomes invalid (e.g. KEY = ;).
+          # Secrets Gradle plugin injects every key into BuildConfig as a String.
+          # Empty values produce invalid Java (KEY = ;). Use non-empty placeholders on CI.
+          # No leading spaces — properties must be flush-left.
           cat > .env << 'EOF'
-          GEMINI_API_KEY=""
-          OPENAI_API_KEY=""
-          DEEPSEEK_API_KEY=""
-          SMTP_HOST=""
-          SMTP_PORT="587"
-          SMTP_USER=""
-          SMTP_PASS=""
-          SMTP_FROM="TaskFlow AI <no-reply@taskflow.ai>"
-          TWILIO_ACCOUNT_SID=""
-          TWILIO_AUTH_TOKEN=""
-          TWILIO_PHONE_NUMBER=""
+          GEMINI_API_KEY=placeholder
+          OPENAI_API_KEY=placeholder
+          DEEPSEEK_API_KEY=placeholder
+          SMTP_HOST=placeholder
+          SMTP_PORT=587
+          SMTP_USER=placeholder
+          SMTP_PASS=placeholder
+          SMTP_FROM=placeholder
+          TWILIO_ACCOUNT_SID=placeholder
+          TWILIO_AUTH_TOKEN=placeholder
+          TWILIO_PHONE_NUMBER=placeholder
           EOF
+          # Strip accidental leading whitespace from heredoc indentation
+          sed -i 's/^[[:space:]]*//' .env
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
