@@ -3,6 +3,7 @@
   "appId": "1:669174966035:web:31208e50cb8816ef3b5ce6",
   "apiKey": "AIzaSyC0AtU07n6ZXgNf9dRrq_C-3XqAVKBQEGg",
   "authDomain": "prismatic-cubist-5sjh2.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-taskflowai-60aac794-1dd5-4b6a-8ab2-b7fbbd1db494",
   "storageBucket": "prismatic-cubist-5sjh2.firebasestorage.app",
   "messagingSenderId": "669174966035",
   "measurementId": "",

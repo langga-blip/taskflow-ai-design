@@ -1,7 +1,9 @@
-// Gemini Live API Audio & WebSocket Client
-// Real-time two-way voice streaming with 16kHz input & 24kHz natural female voice output ('Aoede')
+// OpenAI Realtime Voice WebSocket Client & Audio Engine
+// Real-time bidirectional streaming with 24kHz audio input/output, interruption handling, and Juniper-inspired warm upbeat female voice
 
-export type GeminiLiveState =
+import { createOpenAiRealtimeSessionApi } from '../services/api';
+
+export type OpenAiVoiceState =
   | 'idle'
   | 'connecting'
   | 'ready'
@@ -11,8 +13,8 @@ export type GeminiLiveState =
   | 'error'
   | 'closed';
 
-export interface GeminiLiveCallbacks {
-  onStateChange?: (state: GeminiLiveState) => void;
+export interface OpenAiVoiceCallbacks {
+  onStateChange?: (state: OpenAiVoiceState) => void;
   onUserTranscript?: (accumulatedUserText: string, latestChunk: string) => void;
   onModelTranscript?: (accumulatedModelText: string, latestChunk: string) => void;
   onTurnComplete?: (userText: string, modelText: string) => void;
@@ -22,10 +24,10 @@ export interface GeminiLiveCallbacks {
 }
 
 /**
- * Resample Float32 audio to 16,000 Hz 16-bit linear PCM (Little-Endian)
+ * Resample Float32 audio to 24,000 Hz 16-bit linear PCM (Little-Endian) for OpenAI Realtime
  */
-function resampleAndConvertToPcm16(audioBuffer: Float32Array, inputSampleRate: number): ArrayBuffer {
-  const targetSampleRate = 16000;
+function resampleAndConvertToPcm24(audioBuffer: Float32Array, inputSampleRate: number): ArrayBuffer {
+  const targetSampleRate = 24000;
   if (inputSampleRate === targetSampleRate) {
     const result = new Int16Array(audioBuffer.length);
     for (let i = 0; i < audioBuffer.length; i++) {
@@ -73,57 +75,65 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 /**
- * Convert Base64 16-bit PCM (24kHz, 1 channel) into AudioBuffer
+ * Convert Base64 16-bit PCM (24kHz, 1 channel, little-endian) into AudioBuffer safely
+ * Handles odd byte lengths and byte offsets properly for all browser engines (including Android WebView / Chrome).
  */
 function base64ToPcm24AudioBuffer(ctx: AudioContext, base64: string): AudioBuffer {
   const binary = window.atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  const int16Array = new Int16Array(bytes.buffer);
-  const audioBuffer = ctx.createBuffer(1, int16Array.length, 24000);
+  const len = binary.length;
+  // Ensure even byte length for 16-bit samples
+  const sampleCount = Math.floor(len / 2);
+  const audioBuffer = ctx.createBuffer(1, sampleCount, 24000);
   const channelData = audioBuffer.getChannelData(0);
-  for (let i = 0; i < int16Array.length; i++) {
-    channelData[i] = int16Array[i] / 32768.0;
+
+  for (let i = 0; i < sampleCount; i++) {
+    const byteIndex = i * 2;
+    const low = binary.charCodeAt(byteIndex);
+    const high = binary.charCodeAt(byteIndex + 1);
+    // Signed 16-bit little endian integer
+    let int16 = (high << 8) | low;
+    if (int16 >= 0x8000) {
+      int16 -= 0x10000;
+    }
+    channelData[i] = int16 / 32768.0;
   }
   return audioBuffer;
 }
 
-export class GeminiLiveSessionController {
+export class OpenAiVoiceSessionController {
   private ws: WebSocket | null = null;
   private inputAudioContext: AudioContext | null = null;
   private outputAudioContext: AudioContext | null = null;
   private mediaStream: MediaStream | null = null;
   private scriptProcessor: ScriptProcessorNode | null = null;
   private mediaStreamSource: MediaStreamAudioSourceNode | null = null;
-  
+
   private activeAudioSources: AudioBufferSourceNode[] = [];
   private nextStartTime = 0;
-  
-  private state: GeminiLiveState = 'idle';
-  private callbacks: GeminiLiveCallbacks = {};
-  
+
+  private state: OpenAiVoiceState = 'idle';
+  private callbacks: OpenAiVoiceCallbacks = {};
+
   private accumulatedUserText = '';
   private accumulatedModelText = '';
   private isUserSpeaking = false;
   private isModelSpeaking = false;
 
-  constructor(callbacks: GeminiLiveCallbacks = {}) {
+  constructor(callbacks: OpenAiVoiceCallbacks = {}) {
     this.callbacks = callbacks;
   }
 
-  public getState(): GeminiLiveState {
+  public getState(): OpenAiVoiceState {
     return this.state;
   }
 
-  private setState(newState: GeminiLiveState) {
+  private setState(newState: OpenAiVoiceState) {
     this.state = newState;
     this.callbacks.onStateChange?.(newState);
   }
 
   /**
-   * Start two-way Gemini Live voice session
+   * Start two-way OpenAI Realtime Voice session
    */
   public async start(): Promise<boolean> {
     if (this.state === 'connecting' || this.state === 'listening' || this.state === 'speaking') {
@@ -135,7 +145,17 @@ export class GeminiLiveSessionController {
     this.accumulatedModelText = '';
 
     try {
-      // 1. Request microphone permission
+      // 1. Securely request ephemeral session authentication from backend before opening audio/socket
+      const sessionResult = await createOpenAiRealtimeSessionApi();
+      if (!sessionResult.success) {
+        const errorMsg = sessionResult.error || 'Failed to authenticate OpenAI Realtime voice session. Please ensure OPENAI_API_KEY is configured or use Gemini Live Voice.';
+        console.warn('[OpenAI Voice Client] Session authentication failed:', errorMsg);
+        this.setState('error');
+        this.callbacks.onError?.(errorMsg);
+        return false;
+      }
+
+      // 2. Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -145,26 +165,33 @@ export class GeminiLiveSessionController {
       });
       this.mediaStream = stream;
 
-      // 2. Initialize Output AudioContext for 24kHz Gemini speech output
+      // 3. Initialize Output AudioContext for OpenAI speech output (with cross-browser fallback & resume)
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      this.outputAudioContext = new AudioCtx({ sampleRate: 24000 });
+      try {
+        this.outputAudioContext = new AudioCtx({ sampleRate: 24000 });
+      } catch (e) {
+        this.outputAudioContext = new AudioCtx();
+      }
       if (this.outputAudioContext.state === 'suspended') {
-        await this.outputAudioContext.resume();
+        try {
+          await this.outputAudioContext.resume();
+        } catch (e) {}
       }
 
-      // 3. Initialize Input AudioContext for mic capture
+      // 4. Initialize Input AudioContext for mic capture
       this.inputAudioContext = new AudioCtx();
       if (this.inputAudioContext.state === 'suspended') {
         await this.inputAudioContext.resume();
       }
 
-      // 4. Establish WebSocket connection to backend live bridge
+      // 5. Establish WebSocket connection to backend OpenAI voice bridge with sessionId parameter
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/live-chat`;
+      const sessionParam = sessionResult.sessionId ? `?sessionId=${encodeURIComponent(sessionResult.sessionId)}` : '';
+      const wsUrl = `${protocol}//${window.location.host}/api/openai-voice-chat${sessionParam}`;
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('[Gemini Live Client] Connected to Live WebSocket bridge');
+        console.log('[OpenAI Voice Client] Connected to OpenAI Voice WebSocket bridge');
         this.setupMicProcessing();
       };
 
@@ -173,18 +200,16 @@ export class GeminiLiveSessionController {
       };
 
       this.ws.onerror = (err) => {
-        // Suppress noisy logs if the connection was already closed or stopping
         if (this.state === 'closed' || this.state === 'idle') return;
-        console.warn('[Gemini Live Client] WebSocket event notice:', err);
-        // If still in connecting state when error fires, signal failure
+        console.warn('[OpenAI Voice Client] WebSocket event notice:', err);
         if (this.state === 'connecting') {
           this.setState('error');
-          this.callbacks.onError?.('Could not establish connection to Gemini Live server. Please check your network and API key.');
+          this.callbacks.onError?.('Could not establish connection to OpenAI Voice server. Please check your network and API key.');
         }
       };
 
       this.ws.onclose = (event) => {
-        console.log('[Gemini Live Client] WebSocket closed', event.code, event.reason);
+        console.log('[OpenAI Voice Client] WebSocket closed', event.code, event.reason);
         if (this.state !== 'closed' && this.state !== 'idle') {
           this.setState('closed');
         }
@@ -192,12 +217,12 @@ export class GeminiLiveSessionController {
 
       return true;
     } catch (err: any) {
-      console.error('[Gemini Live Client] Failed to start Live session:', err);
+      console.error('[OpenAI Voice Client] Failed to start Voice session:', err);
       this.setState('error');
       const errMessage =
         err?.name === 'NotAllowedError'
-          ? 'Microphone permission was denied. Please allow microphone access to talk with Gemini Live.'
-          : err?.message || 'Could not start Gemini Live session.';
+          ? 'Microphone permission was denied. Please allow microphone access to talk with OpenAI Voice.'
+          : err?.message || 'Could not start OpenAI Voice session.';
       this.callbacks.onError?.(errMessage);
       this.stop();
       return false;
@@ -212,7 +237,7 @@ export class GeminiLiveSessionController {
 
     try {
       this.mediaStreamSource = this.inputAudioContext.createMediaStreamSource(this.mediaStream);
-      // Process chunks of 4096 samples (approx. 90-100ms)
+      // Process chunks of 4096 samples
       this.scriptProcessor = this.inputAudioContext.createScriptProcessor(4096, 1, 1);
 
       this.scriptProcessor.onaudioprocess = (e) => {
@@ -229,153 +254,172 @@ export class GeminiLiveSessionController {
         const volumeLevel = Math.min(100, Math.round(rms * 400));
         this.callbacks.onInputVolume?.(volumeLevel);
 
-        // Interruption detection: if user speaks with sufficient volume while Gemini is talking, interrupt playback
+        // Interruption detection: if user speaks with sufficient volume while AI is talking, interrupt playback
         if (volumeLevel > 18) {
           if (!this.isUserSpeaking) {
             this.isUserSpeaking = true;
           }
           if (this.isModelSpeaking) {
-            // User interrupted Gemini!
-            this.interrupt();
+            this.stopAudioPlayback();
+            this.setState('interrupted');
+            try {
+              this.ws.send(JSON.stringify({ type: 'interrupt' }));
+            } catch (err) {}
+          }
+          if (this.state !== 'listening') {
+            this.setState('listening');
           }
         } else {
           this.isUserSpeaking = false;
+          if (this.state === 'listening' && !this.isModelSpeaking) {
+            // Keep listening state active
+          }
         }
 
-        // Resample and convert to 16kHz PCM 16-bit
-        const pcm16Buffer = resampleAndConvertToPcm16(
-          inputChannelData,
-          this.inputAudioContext!.sampleRate
-        );
+        // Convert audio to 24kHz PCM16 for OpenAI Realtime
+        const sampleRate = this.inputAudioContext?.sampleRate || 48000;
+        const pcm16Buffer = resampleAndConvertToPcm24(inputChannelData, sampleRate);
         const base64Audio = arrayBufferToBase64(pcm16Buffer);
 
-        // Send to backend Gemini Live session
-        this.ws.send(
-          JSON.stringify({
-            type: 'realtime_audio',
-            data: base64Audio,
-          })
-        );
+        try {
+          this.ws.send(
+            JSON.stringify({
+              type: 'realtime_audio',
+              data: base64Audio,
+            })
+          );
+        } catch (sendErr) {
+          // Socket closed during send
+        }
       };
 
       this.mediaStreamSource.connect(this.scriptProcessor);
       this.scriptProcessor.connect(this.inputAudioContext.destination);
-
-      this.setState('listening');
     } catch (err) {
-      console.error('[Gemini Live Client] Error setting up mic processing:', err);
+      console.error('[OpenAI Voice Client] Error setting up mic processing:', err);
     }
   }
 
   /**
-   * Handle incoming messages from Gemini Live server
+   * Handle incoming messages from backend OpenAI voice bridge
    */
-  private handleServerMessage(rawData: string) {
+  private handleServerMessage(rawData: any) {
     try {
-      const msg = JSON.parse(rawData);
+      const msg = typeof rawData === 'string' ? JSON.parse(rawData) : rawData;
 
       switch (msg.type) {
         case 'session_ready':
-          this.setState('listening');
-          break;
-
-        case 'audio':
-          if (msg.data) {
-            this.playAudioChunk(msg.data);
-          }
-          break;
-
-        case 'text':
-          if (msg.role === 'model' && msg.text) {
-            this.accumulatedModelText += (this.accumulatedModelText ? ' ' : '') + msg.text;
-            this.callbacks.onModelTranscript?.(this.accumulatedModelText, msg.text);
-          } else if (msg.role === 'user' && msg.text) {
-            this.accumulatedUserText += (this.accumulatedUserText ? ' ' : '') + msg.text;
-            this.callbacks.onUserTranscript?.(this.accumulatedUserText, msg.text);
-          }
-          break;
-
-        case 'interrupted':
-          console.log('[Gemini Live] Interruption received from server');
-          this.stopAudioPlayback();
-          this.setState('interrupted');
+          console.log('[OpenAI Voice Client] Session is active and ready');
+          this.setState('ready');
           setTimeout(() => {
-            if (this.state === 'interrupted') {
+            if (this.state === 'ready') {
               this.setState('listening');
             }
           }, 300);
           break;
 
-        case 'turn_complete':
-          if (this.accumulatedUserText || this.accumulatedModelText) {
-            this.callbacks.onTurnComplete?.(
-              this.accumulatedUserText.trim(),
-              this.accumulatedModelText.trim()
-            );
-            this.accumulatedUserText = '';
-            this.accumulatedModelText = '';
+        case 'audio':
+          if (msg.data) {
+            this.isModelSpeaking = true;
+            this.setState('speaking');
+            this.playAudioChunk(msg.data);
           }
           break;
 
+        case 'text':
+          if (msg.role === 'user' && msg.text) {
+            this.accumulatedUserText = (this.accumulatedUserText + ' ' + msg.text).trim();
+            this.callbacks.onUserTranscript?.(this.accumulatedUserText, msg.text);
+          } else if (msg.role === 'model' && msg.text) {
+            this.accumulatedModelText = (this.accumulatedModelText + ' ' + msg.text).trim();
+            this.callbacks.onModelTranscript?.(this.accumulatedModelText, msg.text);
+          }
+          break;
+
+        case 'interrupted':
+          this.stopAudioPlayback();
+          this.setState('interrupted');
+          break;
+
+        case 'turn_complete':
+          this.callbacks.onTurnComplete?.(this.accumulatedUserText, this.accumulatedModelText);
+          this.accumulatedUserText = '';
+          this.accumulatedModelText = '';
+          this.isModelSpeaking = false;
+          setTimeout(() => {
+            if (this.state !== 'closed' && this.state !== 'error') {
+              this.setState('listening');
+            }
+          }, 400);
+          break;
+
         case 'error':
-          console.error('[Gemini Live] Server error:', msg.message);
-          this.callbacks.onError?.(msg.message || 'Gemini Live encountered an error.');
+          // Graceful handling for missing key / engine redirection
+          if (msg.message && (msg.message.includes('OpenAI API key') || msg.message.includes('OPENAI_API_KEY') || msg.message.includes('not configured'))) {
+            console.info('[OpenAI Voice Client Notice]:', msg.message);
+          } else {
+            console.error('[OpenAI Voice Server Error]:', msg.message);
+          }
+          this.setState('error');
+          this.callbacks.onError?.(msg.message || 'OpenAI Voice service error');
           break;
 
         case 'session_closed':
           this.setState('closed');
           break;
       }
-    } catch (err) {
-      console.error('[Gemini Live Client] Error processing message:', err);
+    } catch (e) {
+      console.error('[OpenAI Voice Client] Error parsing server message:', e);
     }
   }
 
   /**
-   * Schedule gapless 24kHz audio playback
+   * Play queued 24kHz PCM audio chunk smoothly
    */
-  private playAudioChunk(base64Audio: string) {
+  private async playAudioChunk(base64Data: string) {
     if (!this.outputAudioContext) return;
 
+    // Ensure AudioContext is running (crucial for Android/mobile WebAudio autoplay policy)
+    if (this.outputAudioContext.state === 'suspended') {
+      try {
+        await this.outputAudioContext.resume();
+      } catch (e) {}
+    }
+
     try {
-      if (this.outputAudioContext.state === 'suspended') {
-        this.outputAudioContext.resume();
-      }
+      const audioBuffer = base64ToPcm24AudioBuffer(this.outputAudioContext, base64Data);
 
-      const audioBuffer = base64ToPcm24AudioBuffer(this.outputAudioContext, base64Audio);
-      const now = this.outputAudioContext.currentTime;
-
-      if (this.nextStartTime < now) {
-        this.nextStartTime = now + 0.03; // small jitter buffer
+      // Measure volume of outgoing speech for visualizer
+      const channel = audioBuffer.getChannelData(0);
+      let sum = 0;
+      for (let i = 0; i < channel.length; i++) {
+        sum += channel[i] * channel[i];
       }
+      const rms = Math.sqrt(sum / channel.length);
+      const outVol = Math.min(100, Math.round(rms * 350));
+      this.callbacks.onOutputVolume?.(outVol);
 
       const source = this.outputAudioContext.createBufferSource();
       source.buffer = audioBuffer;
-
-      // Connect to destination and analyzer for output volume
       source.connect(this.outputAudioContext.destination);
-      source.start(this.nextStartTime);
+
+      const now = this.outputAudioContext.currentTime;
+      // If time drifted behind, resynchronize to current time
+      if (this.nextStartTime < now) {
+        this.nextStartTime = now;
+      }
+      const startTime = this.nextStartTime;
+      source.start(startTime);
+      this.nextStartTime = startTime + audioBuffer.duration;
 
       this.activeAudioSources.push(source);
-      this.nextStartTime += audioBuffer.duration;
-
-      this.isModelSpeaking = true;
-      this.setState('speaking');
-
-      // Estimate output speaking level for visualizer
-      this.callbacks.onOutputVolume?.(75);
 
       source.onended = () => {
         const idx = this.activeAudioSources.indexOf(source);
-        if (idx !== -1) {
+        if (idx > -1) {
           this.activeAudioSources.splice(idx, 1);
         }
-
-        if (
-          this.activeAudioSources.length === 0 &&
-          this.outputAudioContext &&
-          this.nextStartTime <= this.outputAudioContext.currentTime + 0.06
-        ) {
+        if (this.activeAudioSources.length === 0) {
           this.isModelSpeaking = false;
           this.callbacks.onOutputVolume?.(0);
           if (this.state === 'speaking') {
@@ -384,12 +428,12 @@ export class GeminiLiveSessionController {
         }
       };
     } catch (err) {
-      console.error('[Gemini Live Client] Error playing audio chunk:', err);
+      console.error('[OpenAI Voice Client] Error playing audio chunk:', err);
     }
   }
 
   /**
-   * Stop active audio playback immediately (interruption)
+   * Stop all active audio playback immediately upon interruption
    */
   private stopAudioPlayback() {
     for (const src of this.activeAudioSources) {
@@ -424,12 +468,6 @@ export class GeminiLiveSessionController {
    */
   public sendTextMessage(text: string) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(
-        JSON.stringify({
-          type: 'text_input',
-          text,
-        })
-      );
       this.accumulatedUserText += (this.accumulatedUserText ? ' ' : '') + text;
       this.callbacks.onUserTranscript?.(this.accumulatedUserText, text);
     }

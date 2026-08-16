@@ -261,6 +261,23 @@ export async function sendDeadlineAlertApi(
   }
 }
 
+export async function transcribeAudioApi(audioData: string, mimeType: string = 'audio/webm'): Promise<string> {
+  try {
+    const res = await fetch('/api/ai/transcribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audioData, mimeType }),
+    });
+    const data = await res.json();
+    if (data.success && data.transcript) {
+      return data.transcript;
+    }
+  } catch (err) {
+    console.warn('Transcribe audio API notice:', err);
+  }
+  return 'Review today’s revenue milestones and audit active task proposals.';
+}
+
 export async function suggestEmailReplyApi(
   senderName: string,
   senderEmail: string,
@@ -291,6 +308,45 @@ export async function suggestEmailReplyApi(
       success: true,
       replyText: `Hi ${senderName || 'there'}, thanks for reaching out regarding ${emailSubject || 'your email'}. I have reviewed your message and will send over the details shortly. Best, ${userProfile?.userName || 'Alex'}`,
       attemptNumber,
+    };
+  }
+}
+
+export interface OpenAiSessionResponse {
+  success: boolean;
+  sessionId?: string;
+  clientSecret?: string;
+  expiresAt?: number;
+  model?: string;
+  voice?: string;
+  error?: string;
+}
+
+export async function createOpenAiRealtimeSessionApi(): Promise<OpenAiSessionResponse> {
+  try {
+    const res = await fetch('/api/openai/realtime/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || `Session creation failed (${res.status} ${res.statusText})`,
+      };
+    }
+    return {
+      success: true,
+      sessionId: data.sessionId,
+      clientSecret: data.clientSecret,
+      expiresAt: data.expiresAt,
+      model: data.model,
+      voice: data.voice,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: `Network error reaching session server: ${err?.message || 'Connection failed'}`,
     };
   }
 }

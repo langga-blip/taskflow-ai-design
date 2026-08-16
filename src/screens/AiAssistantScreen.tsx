@@ -3,9 +3,11 @@ import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { NeonButton } from '../components/NeonButton';
 import { FormattedTextWithAppEmojis, AppEmoji } from '../components/AppEmoji';
-import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Wand2, Volume2, Image as ImageIcon, X, Eye, ChevronDown, Plus, Play, Square, Mic, MicOff, Radio, Zap } from 'lucide-react';
+import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Wand2, Volume2, Image as ImageIcon, X, Eye, ChevronDown, Plus, Play, Square, Mic, MicOff, Radio, Zap, AudioWaveform } from 'lucide-react';
 import { speakWithGeminiVoice, speakWithTaskFlowAiVoice, stopAllSpeech } from '../utils/speechUtils';
 import { GeminiLiveSessionController, GeminiLiveState } from '../utils/geminiLiveAudio';
+import { OpenAiVoiceSessionController, OpenAiVoiceState } from '../utils/openaiVoiceAudio';
+import { VoiceEngineProvider } from '../types';
 import { autoCorrectText } from '../utils/autoCorrect';
 
 interface ChatMessage {
@@ -73,113 +75,259 @@ export const AiAssistantScreen: React.FC = () => {
   const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
 
-  // Gemini Live Two-Way Voice State
+  // Voice Assistant Engine Selection (Gemini Live vs. OpenAI Realtime Voice)
+  const [voiceEngine, setVoiceEngine] = useState<VoiceEngineProvider>('GEMINI');
+
+  // Real-time Two-Way Voice State (Shared for Gemini & OpenAI)
   const [isLiveActive, setIsLiveActive] = useState(false);
-  const [liveState, setLiveState] = useState<GeminiLiveState>('idle');
+  const [liveState, setLiveState] = useState<GeminiLiveState | OpenAiVoiceState>('idle');
   const [liveUserTranscript, setLiveUserTranscript] = useState('');
   const [liveModelTranscript, setLiveModelTranscript] = useState('');
   const [inputVolume, setInputVolume] = useState(0);
   const [outputVolume, setOutputVolume] = useState(0);
+  
   const liveSessionRef = useRef<GeminiLiveSessionController | null>(null);
+  const openAiVoiceSessionRef = useRef<OpenAiVoiceSessionController | null>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Cleanup Live Voice on component unmount
+  // Cleanup Live Voice sessions on component unmount
   useEffect(() => {
     return () => {
       if (liveSessionRef.current) {
         liveSessionRef.current.stop();
       }
+      if (openAiVoiceSessionRef.current) {
+        openAiVoiceSessionRef.current.stop();
+      }
     };
   }, []);
 
-  // Toggle Gemini Live Two-Way Voice Session (Natural Female Voice - Aoede)
-  const toggleGeminiLive = async () => {
+  // Stop any active live voice session
+  const stopLiveVoiceSession = () => {
+    if (liveSessionRef.current) {
+      liveSessionRef.current.stop();
+      liveSessionRef.current = null;
+    }
+    if (openAiVoiceSessionRef.current) {
+      openAiVoiceSessionRef.current.stop();
+      openAiVoiceSessionRef.current = null;
+    }
+    setIsLiveActive(false);
+    setLiveState('idle');
+    setLiveUserTranscript('');
+    setLiveModelTranscript('');
+    setInputVolume(0);
+    setOutputVolume(0);
+  };
+
+  // Toggle Live Voice Session based on current voiceEngine
+  const toggleVoiceSession = async () => {
     if (isLiveActive) {
-      if (liveSessionRef.current) {
-        liveSessionRef.current.stop();
-        liveSessionRef.current = null;
-      }
-      setIsLiveActive(false);
-      setLiveState('idle');
-      setLiveUserTranscript('');
-      setLiveModelTranscript('');
-      setInputVolume(0);
-      setOutputVolume(0);
-      triggerNotification('Gemini Live Voice Ended 🎙️', 'Two-way voice session concluded.', 'AI');
+      stopLiveVoiceSession();
+      triggerNotification('Voice Assistant Ended 🎙️', `${voiceEngine === 'OPENAI' ? 'OpenAI Real-time Voice' : 'Gemini Live Voice'} session concluded.`, 'AI');
       return;
     }
 
     stopAllSpeech();
+    stopLiveVoiceSession();
+
     setIsLiveActive(true);
     setLiveState('connecting');
     setLiveUserTranscript('');
     setLiveModelTranscript('');
 
-    const session = new GeminiLiveSessionController({
-      onStateChange: (newState) => {
-        setLiveState(newState);
-        if (newState === 'closed' || newState === 'error') {
-          setIsLiveActive(false);
-        }
-      },
-      onUserTranscript: (accumulated) => {
-        setLiveUserTranscript(accumulated);
-      },
-      onModelTranscript: (accumulated) => {
-        setLiveModelTranscript(accumulated);
-      },
-      onTurnComplete: (userText, modelText) => {
-        if (userText || modelText) {
-          const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const newEntries: ChatMessage[] = [];
-          if (userText) {
-            newEntries.push({
-              id: Date.now().toString(),
-              sender: 'user',
-              text: userText,
-              timestamp,
-            });
+    if (voiceEngine === 'OPENAI') {
+      // Start OpenAI Realtime Voice Session (Warm, upbeat female voice inspired by Juniper)
+      const session = new OpenAiVoiceSessionController({
+        onStateChange: (newState) => {
+          setLiveState(newState);
+          if (newState === 'closed' || newState === 'error') {
+            setIsLiveActive(false);
           }
-          if (modelText) {
-            newEntries.push({
-              id: (Date.now() + 1).toString(),
-              sender: 'assistant',
-              text: modelText,
-              timestamp,
-            });
+        },
+        onUserTranscript: (accumulated) => {
+          setLiveUserTranscript(accumulated);
+        },
+        onModelTranscript: (accumulated) => {
+          setLiveModelTranscript(accumulated);
+        },
+        onTurnComplete: (userText, modelText) => {
+          if (userText || modelText) {
+            const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const newEntries: ChatMessage[] = [];
+            if (userText) {
+              newEntries.push({
+                id: Date.now().toString(),
+                sender: 'user',
+                text: userText,
+                timestamp,
+              });
+            }
+            if (modelText) {
+              newEntries.push({
+                id: (Date.now() + 1).toString(),
+                sender: 'assistant',
+                text: modelText,
+                timestamp,
+              });
+            }
+            setMessages((prev) => [...prev, ...newEntries]);
+            setLiveUserTranscript('');
+            setLiveModelTranscript('');
           }
-          setMessages((prev) => [...prev, ...newEntries]);
-          setLiveUserTranscript('');
-          setLiveModelTranscript('');
-        }
-      },
-      onInputVolume: (vol) => {
-        setInputVolume(vol);
-      },
-      onOutputVolume: (vol) => {
-        setOutputVolume(vol);
-      },
-      onError: (errMsg) => {
-        triggerNotification('Gemini Live Voice Notice', errMsg, 'AI');
-        setIsLiveActive(false);
-      },
-    });
+        },
+        onInputVolume: (vol) => {
+          setInputVolume(vol);
+        },
+        onOutputVolume: (vol) => {
+          setOutputVolume(vol);
+        },
+        onError: (errMsg) => {
+          if (errMsg.toLowerCase().includes('openai api key') || errMsg.toLowerCase().includes('incorrect api key') || errMsg.toLowerCase().includes('invalid api key')) {
+            triggerNotification('Switched to Gemini Live Voice 🎙️', 'OpenAI key not configured. Automatically switched you to Gemini Live Two-Way Voice.', 'AI');
+            setVoiceEngine('GEMINI');
+            // Auto-start Gemini Live session seamlessly
+            setTimeout(() => {
+              setIsLiveActive(true);
+              setLiveState('connecting');
+              const geminiSession = new GeminiLiveSessionController({
+                onStateChange: (newState) => {
+                  setLiveState(newState);
+                  if (newState === 'closed' || newState === 'error') {
+                    setIsLiveActive(false);
+                  }
+                },
+                onUserTranscript: (accumulated) => {
+                  setLiveUserTranscript(accumulated);
+                },
+                onModelTranscript: (accumulated) => {
+                  setLiveModelTranscript(accumulated);
+                },
+                onTurnComplete: (userText, modelText) => {
+                  if (userText || modelText) {
+                    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const newEntries: ChatMessage[] = [];
+                    if (userText) {
+                      newEntries.push({
+                        id: Date.now().toString(),
+                        sender: 'user',
+                        text: userText,
+                        timestamp,
+                      });
+                    }
+                    if (modelText) {
+                      newEntries.push({
+                        id: (Date.now() + 1).toString(),
+                        sender: 'assistant',
+                        text: modelText,
+                        timestamp,
+                      });
+                    }
+                    setMessages((prev) => [...prev, ...newEntries]);
+                    setLiveUserTranscript('');
+                    setLiveModelTranscript('');
+                  }
+                },
+                onInputVolume: (vol) => {
+                  setInputVolume(vol);
+                },
+                onOutputVolume: (vol) => {
+                  setOutputVolume(vol);
+                },
+                onError: (gErr) => {
+                  triggerNotification('Live Voice Notice', gErr, 'AI');
+                  setIsLiveActive(false);
+                },
+              });
+              liveSessionRef.current = geminiSession;
+              geminiSession.start();
+            }, 300);
+          } else {
+            triggerNotification('OpenAI Realtime Voice Notice', errMsg, 'AI');
+            setIsLiveActive(false);
+          }
+        },
+      });
 
-    liveSessionRef.current = session;
-    const success = await session.start();
-    if (!success) {
-      setIsLiveActive(false);
-      liveSessionRef.current = null;
+      openAiVoiceSessionRef.current = session;
+      const success = await session.start();
+      if (!success) {
+        setIsLiveActive(false);
+        openAiVoiceSessionRef.current = null;
+      } else {
+        triggerNotification('OpenAI Realtime Voice Active 🎙️', 'Connected with warm, upbeat female voice. Speak freely!', 'AI');
+      }
     } else {
-      triggerNotification('Gemini Live Voice Active 🎙️', 'Connected with Natural Female Voice (Kore). Speak freely!', 'AI');
+      // Start Gemini Live Two-Way Voice Session (Female Kore/Aoede)
+      const session = new GeminiLiveSessionController({
+        onStateChange: (newState) => {
+          setLiveState(newState);
+          if (newState === 'closed' || newState === 'error') {
+            setIsLiveActive(false);
+          }
+        },
+        onUserTranscript: (accumulated) => {
+          setLiveUserTranscript(accumulated);
+        },
+        onModelTranscript: (accumulated) => {
+          setLiveModelTranscript(accumulated);
+        },
+        onTurnComplete: (userText, modelText) => {
+          if (userText || modelText) {
+            const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const newEntries: ChatMessage[] = [];
+            if (userText) {
+              newEntries.push({
+                id: Date.now().toString(),
+                sender: 'user',
+                text: userText,
+                timestamp,
+              });
+            }
+            if (modelText) {
+              newEntries.push({
+                id: (Date.now() + 1).toString(),
+                sender: 'assistant',
+                text: modelText,
+                timestamp,
+              });
+            }
+            setMessages((prev) => [...prev, ...newEntries]);
+            setLiveUserTranscript('');
+            setLiveModelTranscript('');
+          }
+        },
+        onInputVolume: (vol) => {
+          setInputVolume(vol);
+        },
+        onOutputVolume: (vol) => {
+          setOutputVolume(vol);
+        },
+        onError: (errMsg) => {
+          triggerNotification('Gemini Live Voice Notice', errMsg, 'AI');
+          setIsLiveActive(false);
+        },
+      });
+
+      liveSessionRef.current = session;
+      const success = await session.start();
+      if (!success) {
+        setIsLiveActive(false);
+        liveSessionRef.current = null;
+      } else {
+        triggerNotification('Gemini Live Voice Active 🎙️', 'Connected with Natural Female Voice (Kore). Speak freely!', 'AI');
+      }
     }
   };
 
   // User Interruption Trigger
   const handleInterruptLive = () => {
-    if (liveSessionRef.current) {
+    if (voiceEngine === 'OPENAI' && openAiVoiceSessionRef.current) {
+      openAiVoiceSessionRef.current.interrupt();
+      setLiveModelTranscript('');
+    } else if (liveSessionRef.current) {
       liveSessionRef.current.interrupt();
       setLiveModelTranscript('');
     }
@@ -538,6 +686,47 @@ export const AiAssistantScreen: React.FC = () => {
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
+
+            <div className="flex items-center gap-2">
+              <span className={`text-[11px] font-bold uppercase tracking-wider hidden sm:inline ${
+                isLight ? 'text-purple-900' : 'text-slate-400'
+              }`}>
+                Voice:
+              </span>
+              <div className="relative inline-flex items-center">
+                <AudioWaveform className={`w-3.5 h-3.5 absolute left-2.5 pointer-events-none ${
+                  voiceEngine === 'OPENAI' 
+                    ? 'text-emerald-400' 
+                    : isLight ? 'text-pink-600' : 'text-pink-400'
+                }`} />
+                <select
+                  value={voiceEngine}
+                  onChange={(e) => {
+                    const newEngine = e.target.value as VoiceEngineProvider;
+                    if (isLiveActive && newEngine !== voiceEngine) {
+                      stopLiveVoiceSession();
+                    }
+                    setVoiceEngine(newEngine);
+                  }}
+                  className={`appearance-none border rounded-xl pl-8 pr-7 py-1.5 text-xs font-bold focus:outline-none cursor-pointer shadow-sm transition-all ${
+                    voiceEngine === 'OPENAI'
+                      ? isLight
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900 focus:border-emerald-500'
+                        : 'bg-[#0A0C14] border-emerald-500/50 text-emerald-300 focus:border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)]'
+                      : isLight
+                      ? 'bg-pink-50 border-pink-300 text-pink-900 focus:border-pink-500'
+                      : 'bg-[#0A0C14] border-pink-500/50 text-pink-300 focus:border-pink-400 shadow-[0_0_10px_rgba(236,72,153,0.15)]'
+                  }`}
+                  title="Switch between Gemini Live and OpenAI Real-time Voice Assistants"
+                >
+                  <option value="GEMINI">🎙️ Gemini Live (Kore)</option>
+                  <option value="OPENAI">🎙️ OpenAI Realtime (Upbeat)</option>
+                </select>
+                <ChevronDown className={`w-3.5 h-3.5 absolute right-2 pointer-events-none ${
+                  voiceEngine === 'OPENAI' ? 'text-emerald-400' : isLight ? 'text-pink-700' : 'text-pink-400'
+                }`} />
+              </div>
+            </div>
 
             <div className="flex items-center gap-2">
               <span className={`text-[11px] font-bold uppercase tracking-wider hidden sm:inline ${
@@ -919,11 +1108,15 @@ export const AiAssistantScreen: React.FC = () => {
         ))}
       </div>
 
-      {/* Gemini Live Two-Way Voice HUD Banner */}
+      {/* Real-time Two-Way Voice HUD Banner (Gemini Live or OpenAI Realtime) */}
       {isLiveActive && (
         <div
           className={`p-3.5 rounded-2xl border transition-all flex flex-col gap-2.5 shadow-xl animate-fade-in ${
-            isLight
+            voiceEngine === 'OPENAI'
+              ? isLight
+                ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-300 text-slate-800 shadow-emerald-200/50'
+                : 'bg-gradient-to-r from-[#0d2a24]/95 via-[#131726]/95 to-[#0b242a]/95 border-emerald-500/40 text-white shadow-[0_0_25px_rgba(16,185,129,0.25)]'
+              : isLight
               ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-300 text-slate-800 shadow-purple-200/50'
               : 'bg-gradient-to-r from-[#1E1338]/95 via-[#131726]/95 to-[#0F2236]/95 border-purple-500/40 text-white shadow-[0_0_25px_rgba(124,58,237,0.25)]'
           }`}
@@ -932,12 +1125,22 @@ export const AiAssistantScreen: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-pink-500"></span>
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                  voiceEngine === 'OPENAI' ? 'bg-emerald-400' : 'bg-pink-400'
+                }`}></span>
+                <span className={`relative inline-flex rounded-full h-3 w-3 ${
+                  voiceEngine === 'OPENAI' ? 'bg-emerald-500' : 'bg-pink-500'
+                }`}></span>
               </span>
-              <span className="text-xs font-extrabold tracking-wide uppercase bg-gradient-to-r from-pink-400 to-cyan-300 bg-clip-text text-transparent flex items-center gap-1">
-                <Radio className="w-3.5 h-3.5 text-pink-400 animate-pulse" />
-                Gemini Live Voice (Female • Kore)
+              <span className={`text-xs font-extrabold tracking-wide uppercase bg-clip-text text-transparent flex items-center gap-1.5 ${
+                voiceEngine === 'OPENAI'
+                  ? 'bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300'
+                  : 'bg-gradient-to-r from-pink-400 to-cyan-300'
+              }`}>
+                <Radio className={`w-3.5 h-3.5 animate-pulse ${
+                  voiceEngine === 'OPENAI' ? 'text-emerald-400' : 'text-pink-400'
+                }`} />
+                {voiceEngine === 'OPENAI' ? 'OpenAI Real-time Voice (Warm Upbeat Female)' : 'Gemini Live Voice (Female • Kore)'}
               </span>
             </div>
 
@@ -947,10 +1150,14 @@ export const AiAssistantScreen: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleInterruptLive}
-                  className="px-2.5 py-1 rounded-xl bg-pink-600/20 border border-pink-500/50 text-pink-300 hover:bg-pink-600/40 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-sm active:scale-95"
-                  title="Interrupt Gemini's response"
+                  className={`px-2.5 py-1 rounded-xl border text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-sm active:scale-95 ${
+                    voiceEngine === 'OPENAI'
+                      ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 hover:bg-emerald-600/40'
+                      : 'bg-pink-600/20 border-pink-500/50 text-pink-300 hover:bg-pink-600/40'
+                  }`}
+                  title={`Interrupt ${voiceEngine === 'OPENAI' ? 'OpenAI' : 'Gemini'} response`}
                 >
-                  <Zap className="w-3 h-3 text-pink-400" />
+                  <Zap className={`w-3 h-3 ${voiceEngine === 'OPENAI' ? 'text-emerald-400' : 'text-pink-400'}`} />
                   Interrupt
                 </button>
               )}
@@ -959,9 +1166,13 @@ export const AiAssistantScreen: React.FC = () => {
               <span
                 className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
                   liveState === 'speaking'
-                    ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-300 animate-pulse'
+                    ? voiceEngine === 'OPENAI'
+                      ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-300 animate-pulse'
+                      : 'bg-cyan-500/20 border-cyan-400/50 text-cyan-300 animate-pulse'
                     : liveState === 'listening'
-                    ? 'bg-pink-500/20 border-pink-400/50 text-pink-300 animate-pulse'
+                    ? voiceEngine === 'OPENAI'
+                      ? 'bg-teal-500/20 border-teal-400/50 text-teal-300 animate-pulse'
+                      : 'bg-pink-500/20 border-pink-400/50 text-pink-300 animate-pulse'
                     : liveState === 'connecting'
                     ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
                     : liveState === 'interrupted'
@@ -970,7 +1181,7 @@ export const AiAssistantScreen: React.FC = () => {
                 }`}
               >
                 {liveState === 'speaking'
-                  ? 'Gemini Speaking'
+                  ? `${voiceEngine === 'OPENAI' ? 'OpenAI' : 'Gemini'} Speaking`
                   : liveState === 'listening'
                   ? 'Listening to You...'
                   : liveState === 'connecting'
@@ -983,9 +1194,9 @@ export const AiAssistantScreen: React.FC = () => {
               {/* End Voice Call */}
               <button
                 type="button"
-                onClick={toggleGeminiLive}
+                onClick={toggleVoiceSession}
                 className="p-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                title="End Gemini Live Voice Chat"
+                title={`End ${voiceEngine === 'OPENAI' ? 'OpenAI' : 'Gemini'} Live Voice Chat`}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -997,18 +1208,24 @@ export const AiAssistantScreen: React.FC = () => {
             {[40, 70, 100, 60, 90, 45, 80, 55, 95, 65, 85, 50, 75, 40].map((baseHeight, i) => {
               const activeVolume = liveState === 'speaking' ? outputVolume : liveState === 'listening' ? inputVolume : 10;
               const scaledHeight = Math.max(6, Math.min(32, Math.round((baseHeight * (activeVolume + 15)) / 100)));
-              const isCyan = i % 2 === 0;
+              const isEven = i % 2 === 0;
               return (
                 <div
                   key={i}
                   style={{ height: `${scaledHeight}px` }}
                   className={`w-1 rounded-full transition-all duration-75 ${
                     liveState === 'speaking'
-                      ? isCyan
+                      ? voiceEngine === 'OPENAI'
+                        ? isEven
+                          ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]'
+                          : 'bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.6)]'
+                        : isEven
                         ? 'bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.6)]'
                         : 'bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.6)]'
                       : liveState === 'listening'
-                      ? 'bg-pink-400 shadow-[0_0_8px_rgba(244,114,182,0.6)]'
+                      ? voiceEngine === 'OPENAI'
+                        ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]'
+                        : 'bg-pink-400 shadow-[0_0_8px_rgba(244,114,182,0.6)]'
                       : 'bg-slate-600'
                   }`}
                 />
@@ -1021,12 +1238,14 @@ export const AiAssistantScreen: React.FC = () => {
             <div className="flex flex-col gap-1 text-xs max-h-24 overflow-y-auto px-2 py-1 rounded-xl bg-black/20 border border-white/5">
               {liveUserTranscript && (
                 <div className="text-slate-300">
-                  <span className="font-bold text-pink-400">You:</span> {liveUserTranscript}
+                  <span className={`font-bold ${voiceEngine === 'OPENAI' ? 'text-emerald-400' : 'text-pink-400'}`}>You:</span> {liveUserTranscript}
                 </div>
               )}
               {liveModelTranscript && (
                 <div className="text-slate-200">
-                  <span className="font-bold text-cyan-400">Gemini:</span> {liveModelTranscript}
+                  <span className={`font-bold ${voiceEngine === 'OPENAI' ? 'text-teal-300' : 'text-cyan-400'}`}>
+                    {voiceEngine === 'OPENAI' ? 'OpenAI:' : 'Gemini:'}
+                  </span> {liveModelTranscript}
                 </div>
               )}
             </div>
@@ -1131,16 +1350,26 @@ export const AiAssistantScreen: React.FC = () => {
             )}
           </div>
 
-          {/* Gemini Live Microphone Button */}
+          {/* Real-time Voice Microphone Button (OpenAI Realtime or Gemini Live) */}
           <button
             type="button"
-            onClick={toggleGeminiLive}
-            title={isLiveActive ? 'End Gemini Live Voice' : 'Gemini Live Voice Chat (Natural Female Voice)'}
+            onClick={toggleVoiceSession}
+            title={
+              isLiveActive
+                ? `End ${voiceEngine === 'OPENAI' ? 'OpenAI Real-time' : 'Gemini Live'} Voice`
+                : `${voiceEngine === 'OPENAI' ? 'OpenAI Real-time Voice (Warm Upbeat Female)' : 'Gemini Live Voice (Female Kore)'}`
+            }
             className={`relative p-3 rounded-2xl border transition-all cursor-pointer shrink-0 ${
               isLiveActive
-                ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white border-pink-400 shadow-[0_0_15px_rgba(236,72,153,0.5)] animate-pulse'
+                ? voiceEngine === 'OPENAI'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)] animate-pulse'
+                  : 'bg-gradient-to-r from-pink-600 to-purple-600 text-white border-pink-400 shadow-[0_0_15px_rgba(236,72,153,0.5)] animate-pulse'
                 : isLight
-                ? 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700'
+                ? voiceEngine === 'OPENAI'
+                  ? 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700'
+                  : 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-700'
+                : voiceEngine === 'OPENAI'
+                ? 'bg-[#131726] hover:bg-[#1E2338] border-[#2E3552] text-emerald-400 hover:border-emerald-400 hover:text-emerald-300'
                 : 'bg-[#131726] hover:bg-[#1E2338] border-[#2E3552] text-pink-400 hover:border-pink-400 hover:text-pink-300'
             }`}
           >

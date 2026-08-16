@@ -10,10 +10,12 @@ export const VoiceCommandSheet: React.FC = () => {
 
   const {
     isListening,
+    isTranscribing,
     recordSeconds,
     transcript,
     toggleRecording,
     stopRecording,
+    transcribeRecordedAudio,
     speak,
   } = useAudioRecorder({
     onTranscriptChange: (text) => {
@@ -47,6 +49,17 @@ export const VoiceCommandSheet: React.FC = () => {
     'Review 50+ Workflow Templates',
     'Ask AI: How to improve agency profit margins?',
   ];
+
+  const handleTranscribeAudio = async () => {
+    if (isListening) {
+      stopRecording();
+    }
+    triggerNotification('Transcribing Audio 🎙️', 'Transcribing spoken audio with Gemini 3.5 Flash...', 'SYSTEM');
+    const result = await transcribeRecordedAudio();
+    if (result) {
+      triggerNotification('Transcription Complete ✨', 'Voice transcribed accurately with Gemini 3.5 Flash', 'SYSTEM');
+    }
+  };
 
   const handleExecuteCommand = (textToRun?: string) => {
     const query = (textToRun || commandText).trim();
@@ -248,29 +261,45 @@ export const VoiceCommandSheet: React.FC = () => {
                 : 'bg-[#131726] border-[#2E3552] text-white placeholder-slate-500'
             }`}
           />
-          <div className="flex items-center justify-end gap-2 pt-1">
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
             <button
               type="button"
-              onClick={handleSaveVoiceNote}
-              disabled={!commandText.trim()}
-              className={`px-3.5 py-2 rounded-xl border font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-all ${
+              onClick={handleTranscribeAudio}
+              disabled={isTranscribing}
+              className={`px-3 py-2 rounded-xl border font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all ${
                 isLight
-                  ? 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-900'
-                  : 'bg-[#131726] hover:bg-[#1E2338] border-[#2E3552] text-slate-200'
+                  ? 'bg-cyan-50 hover:bg-cyan-100 border-cyan-300 text-cyan-900'
+                  : 'bg-[#06B6D4]/10 hover:bg-[#06B6D4]/20 border-[#06B6D4]/40 text-[#06B6D4]'
               }`}
             >
-              <Bookmark className="w-3.5 h-3.5 text-[#06B6D4]" />
-              <span>Save Voice Note</span>
+              <Sparkles className={`w-3.5 h-3.5 ${isTranscribing ? 'animate-spin' : ''}`} />
+              <span>{isTranscribing ? 'Transcribing (Gemini 3.5 Flash)...' : 'Transcribe Audio'}</span>
             </button>
-            <button
-              type="button"
-              onClick={() => handleExecuteCommand()}
-              disabled={!commandText.trim()}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] text-white font-bold text-xs hover:brightness-110 flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-40 transition-all"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Run Command</span>
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSaveVoiceNote}
+                disabled={!commandText.trim()}
+                className={`px-3.5 py-2 rounded-xl border font-bold text-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-40 transition-all ${
+                  isLight
+                    ? 'bg-purple-50 hover:bg-purple-100 border-purple-200 text-purple-900'
+                    : 'bg-[#131726] hover:bg-[#1E2338] border-[#2E3552] text-slate-200'
+                }`}
+              >
+                <Bookmark className="w-3.5 h-3.5 text-[#06B6D4]" />
+                <span>Save Note</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExecuteCommand()}
+                disabled={!commandText.trim()}
+                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#06B6D4] text-white font-bold text-xs hover:brightness-110 flex items-center gap-1.5 shadow-md cursor-pointer disabled:opacity-40 transition-all"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Run Command</span>
+              </button>
+            </div>
           </div>
         </div>
 

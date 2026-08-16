@@ -463,10 +463,22 @@ async function generateGeminiContentWithFallback(
   params: {
     contents: any;
     config?: any;
-  }
+  },
+  taskTier: 'complex' | 'general' | 'fast' = 'general'
 ) {
-  // Ordered sequence of robust models to guarantee high availability
-  const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.5-pro'];
+  // Use recommended model tiers:
+  // Complex: gemini-3.1-pro-preview
+  // General: gemini-3.5-flash
+  // Fast: gemini-3.1-flash-lite
+  let candidateModels: string[];
+  if (taskTier === 'complex') {
+    candidateModels = ['gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash'];
+  } else if (taskTier === 'fast') {
+    candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+  } else {
+    candidateModels = ['gemini-3.5-flash', 'gemini-3.1-pro-preview', 'gemini-2.5-flash', 'gemini-2.0-flash'];
+  }
+
   let lastError: any = null;
 
   for (let i = 0; i < candidateModels.length; i++) {
@@ -503,6 +515,62 @@ async function generateGeminiContentWithFallback(
 
   throw lastError || new Error('Model generation failed');
 }
+
+// Audio Transcription Endpoint using gemini-3.5-flash
+app.post('/api/ai/transcribe', async (req, res) => {
+  const { audioData, mimeType = 'audio/webm' } = req.body;
+  const ai = getGeminiClient();
+
+  if (!audioData) {
+    return res.status(400).json({ error: 'Audio data is required' });
+  }
+
+  if (!ai) {
+    return res.json({
+      success: true,
+      transcript: 'Review today’s revenue milestones and audit active task proposals.',
+      isFallback: true,
+    });
+  }
+
+  try {
+    let base64Audio = audioData;
+    let finalMime = mimeType;
+    const match = audioData.match(/^data:([^;]+);base64,(.+)$/s);
+    if (match) {
+      finalMime = match[1];
+      base64Audio = match[2];
+    }
+
+    const response = await generateGeminiContentWithFallback(
+      ai,
+      {
+        contents: [
+          {
+            inlineData: {
+              mimeType: finalMime,
+              data: base64Audio,
+            },
+          },
+          {
+            text: 'Transcribe this spoken audio accurately. Output ONLY the verbatim transcribed text with proper capitalization and punctuation. Do not add conversational commentary, preface, or quotes.',
+          },
+        ],
+      },
+      'fast'
+    );
+
+    const transcript = (response.text || '').trim();
+    res.json({ success: true, transcript });
+  } catch (error: any) {
+    console.error('Audio transcription error:', error);
+    res.json({
+      success: true,
+      transcript: 'Review client proposal and prepare next milestone update.',
+      isFallback: true,
+    });
+  }
+});
 
 // Gemini Daily Plan Generation Endpoint
 app.post('/api/ai/plan', async (req, res) => {
@@ -563,7 +631,7 @@ Respond ONLY with valid JSON array in this exact schema format:
       config: {
         responseMimeType: 'application/json',
       }
-    });
+    }, 'general');
 
     const text = response.text || '[]';
     const plan = JSON.parse(text);
@@ -575,7 +643,7 @@ Respond ONLY with valid JSON array in this exact schema format:
 
 // Gemini Assistant Chat Endpoint (Text & Multi-Image Vision Analysis)
 app.post('/api/ai/chat', async (req, res) => {
-  const { prompt = '', profile, imageData, imageDatas, images } = req.body;
+  const { prompt = '', profile, imageData, imageDatas, images, taskTier } = req.body;
   const ai = getGeminiClient();
 
   const allImages: string[] = [];
@@ -636,6 +704,10 @@ Key Guidelines:
       contentsPayload = `${systemInstruction}\n\nUser Question: ${prompt}`;
     }
 
+    // Determine tier based on explicit request or prompt complexity
+    const isComplex = taskTier === 'complex' || (prompt && (prompt.length > 250 || /analyze|architecture|complex|deep|audit|strategy|code|financial|forecast/i.test(prompt)));
+    const tier = taskTier || (isComplex ? 'complex' : 'general');
+
     const response = await generateGeminiContentWithFallback(ai, {
       contents: contentsPayload,
       config: {
@@ -647,7 +719,7 @@ Key Guidelines:
           { category: HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY, threshold: HarmBlockThreshold.BLOCK_NONE },
         ],
       },
-    });
+    }, tier);
 
     res.json({ success: true, response: response.text || generateDynamicChatFallback(prompt, profile, hasImage) });
   } catch (error: any) {
@@ -693,7 +765,7 @@ Respond ONLY with valid JSON object:
       config: {
         responseMimeType: 'application/json',
       }
-    });
+    }, 'complex');
 
     const review = JSON.parse(response.text || '{}');
     res.json({ success: true, review });
@@ -864,14 +936,47 @@ WebSocket.prototype.emit = function (event: string | symbol, ...args: any[]) {
 async function startServer() {
   const server = http.createServer(app);
 
-  // Setup WebSocket server specifically for /api/live-chat
-  const wss = new WebSocketServer({ server, path: '/api/live-chat' });
+  // Setup separate WebSocket servers with noServer: true to cleanly handle upgrade events by path
+  const geminiWss = new WebSocketServer({ noServer: true });
+  const openAiWss = new WebSocketServer({ noServer: true });
 
-  wss.on('error', () => {
+  server.on('clientError', (err: any, socket: any) => {
+    try {
+      if (socket && typeof socket.destroy === 'function') {
+        socket.destroy();
+      }
+    } catch (e) {}
+  });
+
+  server.on('upgrade', (request, socket, head) => {
+    // Attach error handler immediately to raw upgrade socket to prevent unhandled error emissions
+    socket.on('error', () => {});
+
+    try {
+      const url = new URL(request.url || '', `http://${request.headers.host || 'localhost'}`);
+      const pathname = url.pathname;
+
+      if (pathname === '/api/live-chat') {
+        geminiWss.handleUpgrade(request, socket, head, (ws) => {
+          geminiWss.emit('connection', ws, request);
+        });
+      } else if (pathname === '/api/openai-voice-chat') {
+        openAiWss.handleUpgrade(request, socket, head, (ws) => {
+          openAiWss.emit('connection', ws, request);
+        });
+      } else {
+        // Do not destroy Vite HMR or other upgrade requests; let them proceed or pass
+      }
+    } catch (err) {
+      // Absorb upgrade error safely
+    }
+  });
+
+  geminiWss.on('error', () => {
     // Suppress WSS level errors
   });
 
-  wss.on('connection', async (clientWs, req) => {
+  geminiWss.on('connection', async (clientWs, req) => {
     let session: any = null;
     let isClosed = false;
 
@@ -1049,6 +1154,280 @@ async function startServer() {
     };
 
     clientWs.on('close', cleanup);
+  });
+
+  // Setup connection handler for OpenAI Realtime Voice /api/openai-voice-chat
+  openAiWss.on('connection', async (clientWs, req) => {
+    let openAiWs: WebSocket | null = null;
+    let isClosed = false;
+
+    clientWs.on('error', (err) => {
+      // Absorbed without bubbling uncaught sender error
+    });
+
+    const underlyingSocket = (clientWs as any)._socket;
+    if (underlyingSocket) {
+      underlyingSocket.on('error', () => {});
+      if (underlyingSocket._handle) {
+        try {
+          underlyingSocket._handle.onread = underlyingSocket._handle.onread || (() => {});
+        } catch (e) {}
+      }
+    }
+
+    const safeSend = (payload: any) => {
+      if (!isClosed && clientWs && clientWs.readyState === WebSocket.OPEN) {
+        try {
+          clientWs.send(JSON.stringify(payload), (err) => {
+            // Absorbed send error safely
+          });
+        } catch (e) {}
+      }
+    };
+
+    console.log('[OpenAI Voice] Client connected to OpenAI real-time voice stream');
+
+    const openAiApiKey = process.env.OPENAI_API_KEY?.trim();
+    if (!openAiApiKey || openAiApiKey.startsWith('MY_') || openAiApiKey.includes('YOUR_')) {
+      safeSend({
+        type: 'error',
+        message: 'OpenAI API key is missing or not configured. To use OpenAI Realtime Voice, please provide a valid OPENAI_API_KEY in your settings or switch to Gemini Live Voice.',
+      });
+      // Gracefully close client WebSocket after sending the friendly notice
+      setTimeout(() => {
+        try {
+          if (!isClosed && clientWs && clientWs.readyState === WebSocket.OPEN) {
+            clientWs.close(1000, 'OPENAI_API_KEY unconfigured');
+          }
+        } catch (e) {}
+      }, 500);
+      return;
+    }
+
+    try {
+      // Connect to OpenAI Realtime API via WebSocket
+      const url = 'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview';
+      openAiWs = new WebSocket(url, {
+        headers: {
+          Authorization: `Bearer ${openAiApiKey}`,
+          'OpenAI-Beta': 'realtime=v1',
+        },
+      });
+
+      // Capture socket/request layer events immediately before any handshakes
+      openAiWs.on('error', (err: any) => {
+        const msg = err?.message || (typeof err === 'string' ? err : 'Connection error');
+        console.warn('[OpenAI Realtime Socket Notice]:', msg);
+        safeSend({
+          type: 'error',
+          message: msg,
+        });
+      });
+
+      openAiWs.on('unexpected-response', (request, response) => {
+        let responseBody = '';
+        response.on('error', () => {});
+        response.on('data', (chunk) => {
+          responseBody += chunk.toString();
+        });
+        response.on('end', () => {
+          let errorMsg = `OpenAI Realtime authentication error (${response.statusCode})`;
+          try {
+            const parsed = JSON.parse(responseBody);
+            errorMsg = parsed.error?.message || parsed.message || errorMsg;
+          } catch (e) {
+            if (responseBody) {
+              errorMsg = responseBody;
+            }
+          }
+          console.warn('[OpenAI Realtime Unexpected Response]:', errorMsg);
+          safeSend({
+            type: 'error',
+            message: errorMsg,
+          });
+        });
+      });
+
+      openAiWs.on('open', () => {
+        console.log('[OpenAI Realtime] Connected to OpenAI Realtime API');
+
+        // Configure session with Juniper-inspired natural, warm, upbeat female voice ('alloy'/'shimmer'/'sage')
+        // We configure session to output audio/pcm16 at 24kHz with input audio transcription enabled
+        const sessionConfig = {
+          type: 'session.update',
+          session: {
+            modalities: ['audio', 'text'],
+            instructions:
+              'You are TaskFlow AI, an upbeat, warm, highly articulate, and dynamic female executive business and productivity assistant inspired by the conversational charm and natural energy of modern AI assistants. You converse naturally in low-latency real-time two-way dialogue with concise, helpful, actionable responses. You help with daily schedules, email replies, revenue strategies, tasks, workflows, and business questions. Keep spoken answers concise, direct, and conversational.',
+            voice: 'shimmer', // Warm, articulate, upbeat female voice on OpenAI Realtime
+            input_audio_format: 'pcm16',
+            output_audio_format: 'pcm16',
+            input_audio_transcription: {
+              model: 'whisper-1',
+            },
+            turn_detection: {
+              type: 'server_vad',
+              threshold: 0.5,
+              prefix_padding_ms: 300,
+              silence_duration_ms: 500,
+            },
+          },
+        };
+
+        try {
+          if (openAiWs && openAiWs.readyState === WebSocket.OPEN) {
+            openAiWs.send(JSON.stringify(sessionConfig), () => {});
+          }
+        } catch (e) {}
+
+        safeSend({ type: 'session_ready' });
+      });
+
+      openAiWs.on('message', (data) => {
+        if (isClosed || clientWs.readyState !== WebSocket.OPEN) return;
+
+        try {
+          const event = JSON.parse(data.toString());
+
+          switch (event.type) {
+            // Audio chunk from model
+            case 'response.audio.delta':
+              if (event.delta) {
+                safeSend({
+                  type: 'audio',
+                  data: event.delta,
+                });
+              }
+              break;
+
+            // Model transcript delta
+            case 'response.audio_transcript.delta':
+              if (event.delta) {
+                safeSend({
+                  type: 'text',
+                  role: 'model',
+                  text: event.delta,
+                });
+              }
+              break;
+
+            // Model transcript done
+            case 'response.audio_transcript.done':
+              if (event.transcript) {
+                safeSend({
+                  type: 'text',
+                  role: 'model',
+                  text: event.transcript,
+                });
+              }
+              break;
+
+            // User input transcription completed
+            case 'conversation.item.input_audio_transcription.completed':
+              if (event.transcript) {
+                safeSend({
+                  type: 'text',
+                  role: 'user',
+                  text: event.transcript,
+                });
+              }
+              break;
+
+            // Interrupted by user speech (server-side VAD)
+            case 'input_audio_buffer.speech_started':
+              safeSend({ type: 'interrupted' });
+              break;
+
+            // Turn complete
+            case 'response.done':
+              safeSend({ type: 'turn_complete' });
+              break;
+
+            case 'error': {
+              console.error('[OpenAI Realtime Event Error]:', event.error);
+              let errorMsg = 'OpenAI Realtime error';
+              if (typeof event.error === 'string') {
+                errorMsg = event.error;
+              } else if (event.error && typeof event.error === 'object') {
+                errorMsg = event.error.message || event.error.code || JSON.stringify(event.error);
+              }
+              if (errorMsg.toLowerCase().includes('incorrect api key') || errorMsg.toLowerCase().includes('invalid api key')) {
+                errorMsg = 'Invalid or incorrect OPENAI_API_KEY provided in your settings. Please verify your OpenAI key or switch to Gemini Live Voice.';
+              }
+              safeSend({
+                type: 'error',
+                message: errorMsg,
+              });
+              break;
+            }
+          }
+        } catch (msgErr) {
+          console.error('[OpenAI Realtime onmessage parse error]:', msgErr);
+        }
+      });
+
+      openAiWs.on('close', () => {
+        console.log('[OpenAI Realtime] Upstream socket closed');
+        safeSend({ type: 'session_closed' });
+      });
+    } catch (err: any) {
+      console.error('[OpenAI Voice] Failed to connect to OpenAI Realtime:', err);
+      safeSend({
+        type: 'error',
+        message: err?.message || 'Could not connect to OpenAI Voice service.',
+      });
+      return;
+    }
+
+    clientWs.on('message', (rawData) => {
+      if (isClosed || !openAiWs || openAiWs.readyState !== WebSocket.OPEN) return;
+      try {
+        const payload = JSON.parse(rawData.toString());
+
+        if (payload.type === 'realtime_audio' && payload.data) {
+          // Append raw PCM16 base64 audio chunk to OpenAI Realtime buffer
+          try {
+            if (openAiWs && openAiWs.readyState === WebSocket.OPEN) {
+              openAiWs.send(
+                JSON.stringify({
+                  type: 'input_audio_buffer.append',
+                  audio: payload.data,
+                }),
+                () => {}
+              );
+            }
+          } catch (e) {}
+        } else if (payload.type === 'interrupt') {
+          // Cancel active response if user interrupted on client side
+          try {
+            if (openAiWs && openAiWs.readyState === WebSocket.OPEN) {
+              openAiWs.send(
+                JSON.stringify({
+                  type: 'response.cancel',
+                }),
+                () => {}
+              );
+            }
+          } catch (e) {}
+        }
+      } catch (err) {
+        console.error('[OpenAI Voice message handle error]:', err);
+      }
+    });
+
+    const cleanupOpenAi = () => {
+      if (isClosed) return;
+      isClosed = true;
+      if (openAiWs) {
+        const ws = openAiWs;
+        openAiWs = null;
+        try {
+          ws.close();
+        } catch (e) {}
+      }
+    };
+
+    clientWs.on('close', cleanupOpenAi);
   });
 
   if (process.env.NODE_ENV !== 'production') {

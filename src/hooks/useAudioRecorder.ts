@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { speakWithAlexaVoice } from '../utils/speechUtils';
+import { transcribeAudioApi } from '../services/api';
 
 export interface UseAudioRecorderOptions {
   onTranscriptChange?: (text: string) => void;
@@ -9,6 +10,7 @@ export interface UseAudioRecorderOptions {
 
 export interface UseAudioRecorderReturn {
   isListening: boolean;
+  isTranscribing: boolean;
   recordSeconds: number;
   transcript: string;
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
@@ -18,11 +20,13 @@ export interface UseAudioRecorderReturn {
   resetTranscript: () => void;
   speak: (text: string) => void;
   audioBlob: Blob | null;
+  transcribeRecordedAudio: () => Promise<string | null>;
   isSupported: boolean;
 }
 
 export const useAudioRecorder = (options?: UseAudioRecorderOptions): UseAudioRecorderReturn => {
   const [isListening, setIsListening] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [transcript, setTranscript] = useState('');
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -32,14 +36,12 @@ export const useAudioRecorder = (options?: UseAudioRecorderOptions): UseAudioRec
   const audioChunksRef = useRef<Blob[]>([]);
   const isManualStopRef = useRef(false);
   const fallbackIntervalRef = useRef<any>(null);
-  const timerRafRef = useRef<number | null>(null);
-  const lastSecondRef = useRef<number>(0);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   // Smooth timer that doesn't freeze during scrolling
   useEffect(() => {
     if (isListening) {
       const startTime = Date.now();
-      lastSecondRef.current = 0;
       setRecordSeconds(0);
 
       const interval = setInterval(() => {
@@ -61,6 +63,9 @@ export const useAudioRecorder = (options?: UseAudioRecorderOptions): UseAudioRec
       }
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         try { mediaRecorderRef.current.stop(); } catch (e) {}
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       }
       if (fallbackIntervalRef.current) {
         clearInterval(fallbackIntervalRef.current);
@@ -100,11 +105,14 @@ export const useAudioRecorder = (options?: UseAudioRecorderOptions): UseAudioRec
     audioChunksRef.current = [];
     setAudioBlob(null);
 
-    // Try starting MediaRecorder for audio blob if possible
+    // Start MediaRecorder for capturing exact audio bytes for Gemini 3.5 Flash transcription
     if (typeof window !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
+        mediaStreamRef.current = stream;
+        const mediaRecorder = new MediaRecorder(stream, {
+          mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : undefined,
+        });
         mediaRecorderRef.current = mediaRecorder;
 
         mediaRecorder.ondataavailable = (event) => {
@@ -118,17 +126,19 @@ export const useAudioRecorder = (options?: UseAudioRecorderOptions): UseAudioRec
             const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
             setAudioBlob(blob);
           }
-          // Stop audio track streams
-          stream.getTracks().forEach((track) => track.stop());
+          if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+            mediaStreamRef.current = null;
+          }
         };
 
-        mediaRecorder.start();
+        mediaRecorder.start(250);
       } catch (err) {
-        console.warn('MediaRecorder notice:', err);
+        console.warn('MediaRecorder audio capture notice:', err);
       }
     }
 
-    // Try Web Speech API
+    // Try Web Speech API for real-time speech preview while recording
     const SpeechRecognition =
       typeof window !== 'undefined'
         ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -143,19 +153,6 @@ export const useAudioRecorder = (options?: UseAudioRecorderOptions): UseAudioRec
         recognition.lang = typeof navigator !== 'undefined' ? navigator.language || 'en-US' : 'en-US';
 
         recognition.onresult = (event: any) => {
-          let finalTranscript = '';
-          let interimTranscript = '';
-
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const result = event.results[i];
-            if (result.isFinal) {
-              finalTranscript += result[0].transcript;
-            } else {
-              interimTranscript += result[0].transcript;
-            }
-          }
-
-          // Compute accurate mapped text
           let currentText = '';
           for (let i = 0; i < event.results.length; i++) {
             currentText += event.results[i][0].transcript;
@@ -232,8 +229,44 @@ export const useAudioRecorder = (options?: UseAudioRecorderOptions): UseAudioRec
     }
   }, [isListening, startRecording, stopRecording]);
 
+  // Transcribe recorded audio with Gemini 3.5 Flash
+  const transcribeRecordedAudio = useCallback(async (): Promise<string | null> => {
+    if (audioChunksRef.current.length === 0 && !audioBlob) {
+      return transcript || null;
+    }
+
+    setIsTranscribing(true);
+    try {
+      const blob = audioBlob || new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+      });
+      reader.readAsDataURL(blob);
+      const base64Data = await base64Promise;
+
+      const aiTranscript = await transcribeAudioApi(base64Data, blob.type || 'audio/webm');
+      if (aiTranscript && aiTranscript.trim()) {
+        setTranscript(aiTranscript.trim());
+        if (options?.onTranscriptChange) {
+          options.onTranscriptChange(aiTranscript.trim());
+        }
+        setIsTranscribing(false);
+        return aiTranscript.trim();
+      }
+    } catch (err) {
+      console.warn('Gemini 3.5 Flash transcription error:', err);
+    } finally {
+      setIsTranscribing(false);
+    }
+    return transcript || null;
+  }, [audioBlob, options, transcript]);
+
   const resetTranscript = useCallback(() => {
     setTranscript('');
+    audioChunksRef.current = [];
+    setAudioBlob(null);
   }, []);
 
   const speak = useCallback((text: string) => {
@@ -245,6 +278,7 @@ export const useAudioRecorder = (options?: UseAudioRecorderOptions): UseAudioRec
 
   return {
     isListening,
+    isTranscribing,
     recordSeconds,
     transcript,
     setTranscript,
@@ -254,6 +288,8 @@ export const useAudioRecorder = (options?: UseAudioRecorderOptions): UseAudioRec
     resetTranscript,
     speak,
     audioBlob,
+    transcribeRecordedAudio,
     isSupported,
   };
 };
+

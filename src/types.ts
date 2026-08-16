@@ -93,6 +93,8 @@ export interface AppNotification {
 
 export type AiProvider = 'GEMINI' | 'OPENAI' | 'DEEPSEEK';
 
+export type VoiceEngineProvider = 'GEMINI' | 'OPENAI';
+
 export interface CurrencyOption {
   code: string;
   symbol: string;

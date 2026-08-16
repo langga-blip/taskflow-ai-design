@@ -1,0 +1,98 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account and preferences",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "businessName": { "type": "string" },
+        "industry": { "type": "string" },
+        "country": { "type": "string" },
+        "currencyCode": { "type": "string" },
+        "currencySymbol": { "type": "string" },
+        "monthlyRevenueGoal": { "type": "number" },
+        "currentMonthlyRevenue": { "type": "number" },
+        "themeMode": { "type": "string" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "userEmail"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A business action item or workflow task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "priority": { "type": "string" },
+        "revenueImpact": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "isCompleted": { "type": "boolean" },
+        "isAiGenerated": { "type": "boolean" },
+        "estimatedMinutes": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "title"]
+    },
+    "WeeklyReview": {
+      "title": "WeeklyReview",
+      "description": "AI generated weekly business performance review",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "userId": { "type": "string" },
+        "weekTitle": { "type": "string" },
+        "dateRange": { "type": "string" },
+        "totalTasksCompleted": { "type": "number" },
+        "revenueGenerated": { "type": "number" },
+        "productivityScore": { "type": "number" },
+        "winsSummary": { "type": "string" },
+        "bottlenecksSummary": { "type": "string" },
+        "improvementsSummary": { "type": "string" },
+        "nextWeekPriorities": { "type": "string" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "weekTitle"]
+    },
+    "AppNotification": {
+      "title": "AppNotification",
+      "description": "In-app notifications and alerts",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "isRead": { "type": "boolean" },
+        "category": { "type": "string" },
+        "actionRoute": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "message"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile settings document"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "User tasks collection"
+    },
+    "/users/{userId}/reviews/{reviewId}": {
+      "schema": "WeeklyReview",
+      "description": "User weekly performance reviews collection"
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": "AppNotification",
+      "description": "User notifications collection"
+    }
+  }
+}

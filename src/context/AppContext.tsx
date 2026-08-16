@@ -26,6 +26,8 @@ import {
   sendTaskEmailNotificationApi,
   sendDeadlineAlertApi,
 } from '../services/api';
+import { auth, syncUserProfileToFirestore, syncTaskToFirestore, syncWeeklyReviewToFirestore } from '../lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface AppContextType {
   currentScreen: ScreenRoute;
@@ -138,14 +140,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isVoiceSheetOpen, setIsVoiceSheetOpen] = useState(false);
   const [isQuickNavOpen, setIsQuickNavOpen] = useState(false);
 
-  // Sync to local storage
+  // Sync to local storage & Firestore
   useEffect(() => {
     localStorage.setItem('tf_user_profile', JSON.stringify(userProfile));
+    const uid = auth.currentUser?.uid || userProfile.userEmail || 'default_user';
+    syncUserProfileToFirestore(uid, userProfile);
   }, [userProfile]);
 
   useEffect(() => {
     localStorage.setItem('tf_tasks', JSON.stringify(tasks));
-  }, [tasks]);
+    const uid = auth.currentUser?.uid || userProfile.userEmail || 'default_user';
+    tasks.forEach((t) => syncTaskToFirestore(uid, t));
+  }, [tasks, userProfile.userEmail]);
 
   useEffect(() => {
     localStorage.setItem('tf_notifications', JSON.stringify(notifications));
@@ -153,7 +159,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     localStorage.setItem('tf_weekly_reviews', JSON.stringify(weeklyReviews));
-  }, [weeklyReviews]);
+    const uid = auth.currentUser?.uid || userProfile.userEmail || 'default_user';
+    weeklyReviews.forEach((r) => syncWeeklyReviewToFirestore(uid, r));
+  }, [weeklyReviews, userProfile.userEmail]);
+
+  // Listen to Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUserProfileState((prev) => ({
+          ...prev,
+          userName: firebaseUser.displayName || prev.userName,
+          userEmail: firebaseUser.email || prev.userEmail,
+          isOnboarded: true,
+        }));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Fetch exchange rates on start
   useEffect(() => {
