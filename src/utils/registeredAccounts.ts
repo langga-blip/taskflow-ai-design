@@ -3,6 +3,9 @@
 // Demo accounts that exist by default for preview sign-in
 const DEFAULT_EMAILS = [
   'demo@taskflow.ai',
+  'alex@apexscale.com',
+  'alex.rivera@gmail.com',
+  'executive.user@gmail.com',
 ];
 
 const DEFAULT_PHONES = [
