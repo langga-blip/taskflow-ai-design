@@ -1,0 +1,2 @@
+# Placeholder so assets/www exists in git.
+# CI overwrites this folder with the Vite build (full AI Studio UI).

@@ -17,6 +17,28 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install web dependencies
+        run: npm install
+
+      - name: Build React (AI Studio) app for WebView
+        env:
+          VITE_GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: npx vite build
+
+      - name: Copy web build into Android assets
+        run: |
+          mkdir -p app/src/main/assets/www
+          cp -R dist/. app/src/main/assets/www/
+          test -f app/src/main/assets/www/index.html
+          echo "Web assets packaged:"
+          du -sh app/src/main/assets/www
+          find app/src/main/assets/www -type f | head -40
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -29,11 +51,29 @@ jobs:
       - name: Grant execute permission
         run: chmod +x gradlew
 
+      - name: Prepare env for secrets plugin
+        run: |
+          cat > .env << 'EOF'
+          GEMINI_API_KEY=placeholder
+          OPENAI_API_KEY=placeholder
+          DEEPSEEK_API_KEY=placeholder
+          SMTP_HOST=placeholder
+          SMTP_PORT=587
+          SMTP_USER=placeholder
+          SMTP_PASS=placeholder
+          SMTP_FROM=placeholder
+          TWILIO_ACCOUNT_SID=placeholder
+          TWILIO_AUTH_TOKEN=placeholder
+          TWILIO_PHONE_NUMBER=placeholder
+          EOF
+          sed -i 's/^[[:space:]]*//' .env
+
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: TaskFlowAI-Debug-APK
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
