@@ -1,11 +1,11 @@
 import { Task, UserProfile, WeeklyReview, AiProvider } from '../types';
 
-// Prefer alias that always points at current Flash; then stable fallbacks.
+// Only models confirmed working with current Gemini API keys (retired IDs removed).
 const GEMINI_MODELS = [
   'gemini-flash-latest',
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
+  'gemini-flash-lite-latest',
+  'gemini-3.5-flash',
+  'gemini-pro-latest',
 ];
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -151,8 +151,13 @@ export async function callGeminiDirect(
 
   if (!lastGeminiError) {
     lastGeminiError = lastStatus
-      ? `Gemini HTTP ${lastStatus}: ${(lastBody || 'all models failed').slice(0, 160)}`
+      ? `Gemini HTTP ${lastStatus}: ${(lastBody || 'all models failed').slice(0, 220)}`
       : 'Could not reach Gemini (network or all models failed).';
+  }
+  // Prefer a short readable reason over raw JSON walls
+  if (lastGeminiError.includes('not found') || lastGeminiError.includes('NOT_FOUND')) {
+    lastGeminiError =
+      'No available Gemini model accepted this key. Re-save your key in Profile and ensure Generative Language API is enabled for the key.';
   }
   return null;
 }
