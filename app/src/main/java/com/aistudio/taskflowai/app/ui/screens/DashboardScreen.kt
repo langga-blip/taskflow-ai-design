@@ -66,7 +66,7 @@ fun DashboardScreen(viewModel: TaskFlowViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = if (userProfile.isSubscribed) Icons.Default.Crown else Icons.Default.AutoAwesome,
+                        imageVector = if (userProfile.isSubscribed) Icons.Default.WorkspacePremium else Icons.Default.AutoAwesome,
                         contentDescription = null,
                         tint = if (userProfile.isSubscribed) AmberGlow else NeonCyan,
                         modifier = Modifier.size(14.dp)

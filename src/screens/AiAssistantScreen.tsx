@@ -4,7 +4,7 @@ import { GlassCard } from '../components/GlassCard';
 import { NeonButton } from '../components/NeonButton';
 import { FormattedTextWithAppEmojis, AppEmoji } from '../components/AppEmoji';
 import { Bot, Sparkles, Send, User, Copy, Check, Cpu, Trash2, Mail, Calendar, HardDrive, Reply, SendHorizontal, AlertCircle, CheckCircle2, Wand2, Volume2, Image as ImageIcon, X, Eye, ChevronDown, Plus, Play, Square, Mic, MicOff, Radio, Zap, AudioWaveform } from 'lucide-react';
-import { speakWithGeminiVoice, speakWithTaskFlowAiVoice, stopAllSpeech } from '../utils/speechUtils';
+import { speakWithGeminiVoice, speakWithTaskFlowAiVoice, stopAllSpeech, createVoiceRecognizer } from '../utils/speechUtils';
 import { GeminiLiveSessionController, GeminiLiveState } from '../utils/geminiLiveAudio';
 import { OpenAiVoiceSessionController, OpenAiVoiceState } from '../utils/openaiVoiceAudio';
 import { VoiceEngineProvider } from '../types';
@@ -88,6 +88,9 @@ export const AiAssistantScreen: React.FC = () => {
   
   const liveSessionRef = useRef<GeminiLiveSessionController | null>(null);
   const openAiVoiceSessionRef = useRef<OpenAiVoiceSessionController | null>(null);
+  const sttRecognizerRef = useRef<ReturnType<typeof createVoiceRecognizer> | null>(null);
+  const sttFinalRef = useRef('');
+
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -114,6 +117,11 @@ export const AiAssistantScreen: React.FC = () => {
       openAiVoiceSessionRef.current.stop();
       openAiVoiceSessionRef.current = null;
     }
+    if (sttRecognizerRef.current) {
+      try { sttRecognizerRef.current.stop(); } catch (e) {}
+      sttRecognizerRef.current = null;
+    }
+    sttFinalRef.current = '';
     setIsLiveActive(false);
     setLiveState('idle');
     setLiveUserTranscript('');
@@ -121,6 +129,67 @@ export const AiAssistantScreen: React.FC = () => {
     setInputVolume(0);
     setOutputVolume(0);
   };
+
+  /** APK / file:// fallback: SpeechRecognition -> online Gemini (askAssistant) -> TTS */
+  const startSttGeminiVoiceFallback = async () => {
+    setIsLiveActive(true);
+    setLiveState('listening');
+    setLiveUserTranscript('');
+    setLiveModelTranscript('');
+    sttFinalRef.current = '';
+    triggerNotification(
+      'Voice Chat Active 🎙️',
+      'Using speech-to-text + online Gemini + voice reply (WebView mode).',
+      'AI'
+    );
+
+    const recognizer = createVoiceRecognizer(
+      (partial) => {
+        sttFinalRef.current = partial;
+        setLiveUserTranscript(partial);
+        setInputVolume(Math.min(100, 30 + (partial.length % 40)));
+      },
+      (errMsg) => {
+        triggerNotification('Voice Notice', errMsg || 'Speech recognition issue', 'AI');
+      },
+      async () => {
+        const spoken = (sttFinalRef.current || '').trim();
+        if (!spoken) {
+          setLiveState('listening');
+          return;
+        }
+        setLiveState('speaking');
+        setInputVolume(0);
+        try {
+          const reply = await askAssistant(spoken);
+          setLiveModelTranscript(reply);
+          const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          setMessages((prev) => [
+            ...prev,
+            { id: Date.now().toString(), sender: 'user', text: spoken, timestamp },
+            { id: (Date.now() + 1).toString(), sender: 'assistant', text: reply, timestamp },
+          ]);
+          speakWithTaskFlowAiVoice(reply, {
+            onEnd: () => {
+              setLiveModelTranscript('');
+              setLiveUserTranscript('');
+              sttFinalRef.current = '';
+              setLiveState('listening');
+              // Restart listening for continuous conversation
+              if (sttRecognizerRef.current) {
+                sttRecognizerRef.current.start();
+              }
+            },
+          });
+        } catch (e) {
+          setLiveState('listening');
+        }
+      }
+    );
+    sttRecognizerRef.current = recognizer;
+    await recognizer.start();
+  };
+
 
   // Toggle Live Voice Session based on current voiceEngine
   const toggleVoiceSession = async () => {
@@ -314,8 +383,9 @@ export const AiAssistantScreen: React.FC = () => {
       liveSessionRef.current = session;
       const success = await session.start();
       if (!success) {
-        setIsLiveActive(false);
         liveSessionRef.current = null;
+        // WebView / no live bridge: fall back to STT + online Gemini + TTS
+        await startSttGeminiVoiceFallback();
       } else {
         triggerNotification('Gemini Live Voice Active 🎙️', 'Connected with Natural Female Voice (Kore). Speak freely!', 'AI');
       }

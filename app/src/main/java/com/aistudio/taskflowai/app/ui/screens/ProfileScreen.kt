@@ -7,9 +7,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Crown
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.ShieldCheck
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -84,7 +84,7 @@ fun ProfileScreen(viewModel: TaskFlowViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Crown, contentDescription = null, tint = AmberGlow)
+                        Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = AmberGlow)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("TaskFlow Pro 3-Month Pass", color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                     }
