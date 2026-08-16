@@ -8,6 +8,12 @@ let activeSpeechUtterances: SpeechSynthesisUtterance[] = [];
  */
 export const stopAllSpeech = () => {
   try {
+    if (activeGeminiAudio) {
+      activeGeminiAudio.pause();
+      activeGeminiAudio = null;
+    }
+  } catch (e) {}
+  try {
     const bridge = (window as any)?.AndroidBridge;
     if (bridge && typeof bridge.stopSpeaking === 'function') {
       bridge.stopSpeaking();
@@ -34,10 +40,156 @@ export const cleanTextForSpeech = (text: string): string => {
     .trim();
 };
 
+
+/** Convert base64 PCM L16 (mono) to a WAV data URL for HTMLAudioElement playback */
+function pcm16Base64ToWavDataUrl(base64Pcm: string, sampleRate = 24000): string {
+  const binary = atob(base64Pcm);
+  const len = binary.length;
+  const pcm = new Uint8Array(len);
+  for (let i = 0; i < len; i++) pcm[i] = binary.charCodeAt(i);
+
+  const buffer = new ArrayBuffer(44 + pcm.length);
+  const view = new DataView(buffer);
+  const writeStr = (offset: number, str: string) => {
+    for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+  };
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + pcm.length, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true); // pcm chunk size
+  view.setUint16(20, 1, true); // linear PCM
+  view.setUint16(22, 1, true); // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true); // block align
+  view.setUint16(34, 16, true); // bits
+  writeStr(36, 'data');
+  view.setUint32(40, pcm.length, true);
+  new Uint8Array(buffer, 44).set(pcm);
+
+  let bin = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return 'data:audio/wav;base64,' + btoa(bin);
+}
+
+let activeGeminiAudio: HTMLAudioElement | null = null;
+
+/**
+ * Speak with Gemini TTS voice "Kore" (same family as Google AI Studio / Gemini Live).
+ * Falls back to native Android TTS, then browser speechSynthesis.
+ */
+export async function speakWithGeminiKoreVoice(
+  text: string,
+  options?: { onStart?: () => void; onEnd?: () => void }
+): Promise<void> {
+  const cleanText = cleanTextForSpeech(text || '');
+  if (!cleanText) {
+    options?.onEnd?.();
+    return;
+  }
+
+  stopAllSpeech();
+
+  // Resolve API key from the same storage as chat
+  let apiKey = '';
+  try {
+    apiKey =
+      localStorage.getItem('taskflow_gemini_key') ||
+      localStorage.getItem('tf_gemini_api_key') ||
+      '';
+  } catch {
+    /* ignore */
+  }
+  if (!apiKey || apiKey === 'placeholder') {
+    // Fall through to native/browser TTS below via speakWithTaskFlowAiVoiceLegacy
+    speakWithTaskFlowAiVoiceLegacy(cleanText, options);
+    return;
+  }
+
+  const ttsModels = [
+    'gemini-2.5-flash-preview-tts',
+    'gemini-2.5-pro-preview-tts',
+    'gemini-3.1-flash-tts-preview',
+  ];
+
+  for (const model of ttsModels) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: cleanText }] }],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: 'Kore' },
+              },
+            },
+          },
+        }),
+      });
+      if (!res.ok) {
+        console.warn('[Gemini TTS]', model, res.status);
+        continue;
+      }
+      const data = await res.json();
+      const inline = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+      const b64 = inline?.data;
+      const mime = String(inline?.mimeType || '');
+      if (!b64) continue;
+
+      let audioUrl = '';
+      if (mime.includes('L16') || mime.includes('pcm')) {
+        const rateMatch = mime.match(/rate=(\d+)/);
+        const rate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+        audioUrl = pcm16Base64ToWavDataUrl(b64, rate);
+      } else if (mime.includes('audio/')) {
+        audioUrl = `data:${mime};base64,${b64}`;
+      } else {
+        audioUrl = pcm16Base64ToWavDataUrl(b64, 24000);
+      }
+
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const done = () => {
+          if (finished) return;
+          finished = true;
+          activeGeminiAudio = null;
+          options?.onEnd?.();
+          resolve();
+        };
+        const audio = new Audio(audioUrl);
+        activeGeminiAudio = audio;
+        audio.onplay = () => {
+          try {
+            options?.onStart?.();
+          } catch (_) {}
+        };
+        audio.onended = done;
+        audio.onerror = done;
+        // Safety timeout
+        window.setTimeout(done, Math.min(180000, 3000 + cleanText.length * 120));
+        audio.play().catch(() => done());
+      });
+      return;
+    } catch (err) {
+      console.warn('[Gemini TTS] error', model, err);
+    }
+  }
+
+  // Fallback: native Android / browser TTS
+  speakWithTaskFlowAiVoiceLegacy(cleanText, options);
+}
+
+
 /**
  * Speak using Task Flow AI voice styling (warm, articulate, expressive, natural cadence)
  */
-export const speakWithTaskFlowAiVoice = (
+const speakWithTaskFlowAiVoiceLegacy = (
   text: string,
   options?: { onStart?: () => void; onEnd?: () => void }
 ) => {
@@ -167,6 +319,15 @@ export const speakWithTaskFlowAiVoice = (
     console.warn('Task Flow AI voice synthesis notice:', err);
     options?.onEnd?.();
   }
+};
+
+/** Public speak API — Gemini Kore voice first, then Android/browser TTS */
+export const speakWithTaskFlowAiVoice = (
+  text: string,
+  options?: { onStart?: () => void; onEnd?: () => void }
+) => {
+  // Fire-and-forget async Kore TTS
+  void speakWithGeminiKoreVoice(text, options);
 };
 
 // Aliases for compatibility

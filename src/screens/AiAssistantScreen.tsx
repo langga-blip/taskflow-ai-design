@@ -89,8 +89,13 @@ export const AiAssistantScreen: React.FC = () => {
   
   const liveSessionRef = useRef<GeminiLiveSessionController | null>(null);
   const openAiVoiceSessionRef = useRef<OpenAiVoiceSessionController | null>(null);
+  const isLiveActiveRef = useRef(false);
   const sttRecognizerRef = useRef<ReturnType<typeof createVoiceRecognizer> | null>(null);
   const sttFinalRef = useRef('');
+
+  useEffect(() => {
+    isLiveActiveRef.current = isLiveActive;
+  }, [isLiveActive]);
 
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -133,19 +138,20 @@ export const AiAssistantScreen: React.FC = () => {
 
   /** APK / file:// fallback: SpeechRecognition OR MediaRecorder+Gemini transcribe -> askAssistant -> TTS */
   const restartListeningIfActive = () => {
-    if (!isLiveActive) return;
+    if (!isLiveActiveRef.current) return;
     setLiveState('listening');
     setLiveUserTranscript('');
     setLiveModelTranscript('');
     sttFinalRef.current = '';
-    // Small gap so TTS / mic don't overlap
+    // Gap so Kore TTS / mic don't overlap
     window.setTimeout(() => {
-      if (sttRecognizerRef.current && isLiveActive) {
+      if (!isLiveActiveRef.current) return;
+      if (sttRecognizerRef.current) {
         try {
           sttRecognizerRef.current.start();
         } catch (_) {}
       }
-    }, 400);
+    }, 600);
   };
 
   const processSpokenAndReply = async (spoken: string) => {
@@ -211,13 +217,13 @@ export const AiAssistantScreen: React.FC = () => {
       // Record ~4s chunks for push-style turns in WebView
       recorder.start();
       setLiveState('listening');
-      setLiveUserTranscript('Listening… speak now (7s)');
+      setLiveUserTranscript('Listening… speak clearly now');
       setInputVolume(60);
       setTimeout(() => {
         try {
           if (recorder.state === 'recording') recorder.stop();
         } catch (_) {}
-      }, 7000);
+      }, 8000);
       // expose stop via recognizer-like handle
       sttRecognizerRef.current = {
         start: async () => {

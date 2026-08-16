@@ -543,7 +543,7 @@ export async function transcribeAudioApi(audioData: string, mimeType: string = '
               {
                 role: 'user',
                 parts: [
-                  { text: 'Transcribe this audio exactly. Return only the spoken words.' },
+                  { text: 'You are a precise speech-to-text engine. Transcribe the audio verbatim in the spoken language. Preserve names, numbers, and punctuation. Return ONLY the transcript text — no quotes, no labels, no commentary.' },
                   { inlineData: { mimeType: mimeType || 'audio/webm', data: pure } },
                 ],
               },
