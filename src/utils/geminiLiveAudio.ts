@@ -1,5 +1,7 @@
 // Gemini Live API Audio & WebSocket Client
 // Real-time two-way voice streaming with 16kHz input & 24kHz natural female voice output ('Aoede')
+// On Android WebView (file://) the /api/live-chat bridge is unavailable — start() fails fast
+// so AiAssistantScreen can fall back to SpeechRecognition + online Gemini + speechSynthesis.
 
 export type GeminiLiveState =
   | 'idle'
@@ -19,6 +21,14 @@ export interface GeminiLiveCallbacks {
   onInputVolume?: (level: number) => void; // 0 to 100
   onOutputVolume?: (level: number) => void; // 0 to 100
   onError?: (errorMessage: string) => void;
+}
+
+function isFileProtocol(): boolean {
+  try {
+    return typeof window !== 'undefined' && window.location?.protocol === 'file:';
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -59,9 +69,6 @@ function resampleAndConvertToPcm16(audioBuffer: Float32Array, inputSampleRate: n
   return result.buffer;
 }
 
-/**
- * Convert ArrayBuffer to Base64
- */
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   let binary = '';
   const bytes = new Uint8Array(buffer);
@@ -72,9 +79,6 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return window.btoa(binary);
 }
 
-/**
- * Convert Base64 16-bit PCM (24kHz, 1 channel) into AudioBuffer
- */
 function base64ToPcm24AudioBuffer(ctx: AudioContext, base64: string): AudioBuffer {
   const binary = window.atob(base64);
   const bytes = new Uint8Array(binary.length);
@@ -122,9 +126,6 @@ export class GeminiLiveSessionController {
     this.callbacks.onStateChange?.(newState);
   }
 
-  /**
-   * Start two-way Gemini Live voice session
-   */
   public async start(): Promise<boolean> {
     if (this.state === 'connecting' || this.state === 'listening' || this.state === 'speaking') {
       return true;
@@ -134,8 +135,17 @@ export class GeminiLiveSessionController {
     this.accumulatedUserText = '';
     this.accumulatedModelText = '';
 
+    // Android WebView loads file:// — no Node live-chat bridge
+    if (isFileProtocol()) {
+      this.setState('error');
+      this.callbacks.onError?.(
+        'LIVE_WS_UNAVAILABLE: Gemini Live WebSocket needs the hosted server. Use speech-to-text + online Gemini + TTS fallback in the APK.'
+      );
+      this.stop();
+      return false;
+    }
+
     try {
-      // 1. Request microphone permission
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -145,20 +155,17 @@ export class GeminiLiveSessionController {
       });
       this.mediaStream = stream;
 
-      // 2. Initialize Output AudioContext for 24kHz Gemini speech output
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       this.outputAudioContext = new AudioCtx({ sampleRate: 24000 });
       if (this.outputAudioContext.state === 'suspended') {
         await this.outputAudioContext.resume();
       }
 
-      // 3. Initialize Input AudioContext for mic capture
       this.inputAudioContext = new AudioCtx();
       if (this.inputAudioContext.state === 'suspended') {
         await this.inputAudioContext.resume();
       }
 
-      // 4. Establish WebSocket connection to backend live bridge
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsUrl = `${protocol}//${window.location.host}/api/live-chat`;
       this.ws = new WebSocket(wsUrl);
@@ -173,10 +180,8 @@ export class GeminiLiveSessionController {
       };
 
       this.ws.onerror = (err) => {
-        // Suppress noisy logs if the connection was already closed or stopping
         if (this.state === 'closed' || this.state === 'idle') return;
         console.warn('[Gemini Live Client] WebSocket event notice:', err);
-        // If still in connecting state when error fires, signal failure
         if (this.state === 'connecting') {
           this.setState('error');
           this.callbacks.onError?.('Could not establish connection to Gemini Live server. Please check your network and API key.');
@@ -204,15 +209,11 @@ export class GeminiLiveSessionController {
     }
   }
 
-  /**
-   * Capture and stream microphone audio
-   */
   private setupMicProcessing() {
     if (!this.inputAudioContext || !this.mediaStream) return;
 
     try {
       this.mediaStreamSource = this.inputAudioContext.createMediaStreamSource(this.mediaStream);
-      // Process chunks of 4096 samples (approx. 90-100ms)
       this.scriptProcessor = this.inputAudioContext.createScriptProcessor(4096, 1, 1);
 
       this.scriptProcessor.onaudioprocess = (e) => {
@@ -220,7 +221,6 @@ export class GeminiLiveSessionController {
 
         const inputChannelData = e.inputBuffer.getChannelData(0);
 
-        // Compute volume level for real-time visualizer
         let sum = 0;
         for (let i = 0; i < inputChannelData.length; i++) {
           sum += inputChannelData[i] * inputChannelData[i];
@@ -229,27 +229,23 @@ export class GeminiLiveSessionController {
         const volumeLevel = Math.min(100, Math.round(rms * 400));
         this.callbacks.onInputVolume?.(volumeLevel);
 
-        // Interruption detection: if user speaks with sufficient volume while Gemini is talking, interrupt playback
         if (volumeLevel > 18) {
           if (!this.isUserSpeaking) {
             this.isUserSpeaking = true;
           }
           if (this.isModelSpeaking) {
-            // User interrupted Gemini!
             this.interrupt();
           }
         } else {
           this.isUserSpeaking = false;
         }
 
-        // Resample and convert to 16kHz PCM 16-bit
         const pcm16Buffer = resampleAndConvertToPcm16(
           inputChannelData,
           this.inputAudioContext!.sampleRate
         );
         const base64Audio = arrayBufferToBase64(pcm16Buffer);
 
-        // Send to backend Gemini Live session
         this.ws.send(
           JSON.stringify({
             type: 'realtime_audio',
@@ -267,9 +263,6 @@ export class GeminiLiveSessionController {
     }
   }
 
-  /**
-   * Handle incoming messages from Gemini Live server
-   */
   private handleServerMessage(rawData: string) {
     try {
       const msg = JSON.parse(rawData);
@@ -296,7 +289,6 @@ export class GeminiLiveSessionController {
           break;
 
         case 'interrupted':
-          console.log('[Gemini Live] Interruption received from server');
           this.stopAudioPlayback();
           this.setState('interrupted');
           setTimeout(() => {
@@ -318,7 +310,6 @@ export class GeminiLiveSessionController {
           break;
 
         case 'error':
-          console.error('[Gemini Live] Server error:', msg.message);
           this.callbacks.onError?.(msg.message || 'Gemini Live encountered an error.');
           break;
 
@@ -331,9 +322,6 @@ export class GeminiLiveSessionController {
     }
   }
 
-  /**
-   * Schedule gapless 24kHz audio playback
-   */
   private playAudioChunk(base64Audio: string) {
     if (!this.outputAudioContext) return;
 
@@ -346,13 +334,11 @@ export class GeminiLiveSessionController {
       const now = this.outputAudioContext.currentTime;
 
       if (this.nextStartTime < now) {
-        this.nextStartTime = now + 0.03; // small jitter buffer
+        this.nextStartTime = now + 0.03;
       }
 
       const source = this.outputAudioContext.createBufferSource();
       source.buffer = audioBuffer;
-
-      // Connect to destination and analyzer for output volume
       source.connect(this.outputAudioContext.destination);
       source.start(this.nextStartTime);
 
@@ -361,8 +347,6 @@ export class GeminiLiveSessionController {
 
       this.isModelSpeaking = true;
       this.setState('speaking');
-
-      // Estimate output speaking level for visualizer
       this.callbacks.onOutputVolume?.(75);
 
       source.onended = () => {
@@ -388,9 +372,6 @@ export class GeminiLiveSessionController {
     }
   }
 
-  /**
-   * Stop active audio playback immediately (interruption)
-   */
   private stopAudioPlayback() {
     for (const src of this.activeAudioSources) {
       try {
@@ -406,9 +387,6 @@ export class GeminiLiveSessionController {
     this.callbacks.onOutputVolume?.(0);
   }
 
-  /**
-   * Trigger user interruption
-   */
   public interrupt() {
     this.stopAudioPlayback();
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -419,9 +397,6 @@ export class GeminiLiveSessionController {
     this.setState('listening');
   }
 
-  /**
-   * Send text prompt directly into the live conversation
-   */
   public sendTextMessage(text: string) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(
@@ -435,9 +410,6 @@ export class GeminiLiveSessionController {
     }
   }
 
-  /**
-   * Stop the session and clean up all audio nodes and sockets
-   */
   public stop() {
     this.stopAudioPlayback();
 
