@@ -187,10 +187,27 @@ export const AiAssistantScreen: React.FC = () => {
   };
 
   const startMediaRecorderGeminiVoice = async () => {
+    if (!isLiveActiveRef.current) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
-      const recorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1,
+        },
+      });
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : 'audio/mp4';
+      let recorder: MediaRecorder;
+      try {
+        recorder = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 128000 });
+      } catch {
+        recorder = new MediaRecorder(stream);
+      }
       const chunks: BlobPart[] = [];
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunks.push(e.data);
@@ -198,7 +215,15 @@ export const AiAssistantScreen: React.FC = () => {
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         try {
+          if (audioCtx) {
+            try { await audioCtx.close(); } catch (_) {}
+          }
           const blob = new Blob(chunks, { type: mime });
+          if (blob.size < 2000) {
+            // Almost empty — listen again
+            restartListeningIfActive();
+            return;
+          }
           const reader = new FileReader();
           const dataUrl: string = await new Promise((resolve, reject) => {
             reader.onloadend = () => resolve(String(reader.result || ''));
@@ -207,34 +232,78 @@ export const AiAssistantScreen: React.FC = () => {
           });
           setLiveState('connecting');
           setLiveUserTranscript('Transcribing…');
-          const spoken = await transcribeAudioApi(dataUrl, mime);
+          const spoken = await transcribeAudioApi(dataUrl, mime.split(';')[0]);
           await processSpokenAndReply(spoken || '');
         } catch (err: any) {
           triggerNotification('Voice Notice', err?.message || 'Could not transcribe audio', 'AI');
           restartListeningIfActive();
         }
       };
-      // Record ~4s chunks for push-style turns in WebView
-      recorder.start();
-      setLiveState('listening');
-      setLiveUserTranscript('Listening… speak clearly now');
-      setInputVolume(60);
-      setTimeout(() => {
+
+      // Silence detection: stop early when user finishes speaking (faster turns)
+      let audioCtx: AudioContext | null = null;
+      let maxMs = 10000;
+      let minMs = 1500;
+      let silenceMs = 0;
+      let heardSpeech = false;
+      let stopped = false;
+      const stopRec = () => {
+        if (stopped) return;
+        stopped = true;
         try {
           if (recorder.state === 'recording') recorder.stop();
         } catch (_) {}
-      }, 8000);
-      // expose stop via recognizer-like handle
+      };
+
+      try {
+        audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+        const data = new Uint8Array(analyser.fftSize);
+        const startedAt = Date.now();
+        const tick = () => {
+          if (stopped || !isLiveActiveRef.current) return;
+          analyser.getByteTimeDomainData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) {
+            const v = (data[i] - 128) / 128;
+            sum += v * v;
+          }
+          const rms = Math.sqrt(sum / data.length);
+          const level = Math.min(100, Math.round(rms * 400));
+          setInputVolume(level);
+          const elapsed = Date.now() - startedAt;
+          if (rms > 0.045) {
+            heardSpeech = true;
+            silenceMs = 0;
+          } else if (heardSpeech) {
+            silenceMs += 100;
+          }
+          // Stop after ~1.1s silence once user has spoken, or max window
+          if (elapsed >= maxMs || (heardSpeech && silenceMs >= 1100 && elapsed >= minMs)) {
+            stopRec();
+            return;
+          }
+          window.setTimeout(tick, 100);
+        };
+        window.setTimeout(tick, 100);
+      } catch (_) {
+        window.setTimeout(stopRec, maxMs);
+      }
+
+      recorder.start(250);
+      setLiveState('listening');
+      setLiveUserTranscript('Listening… speak now');
+      setInputVolume(40);
+
       sttRecognizerRef.current = {
         start: async () => {
           await startMediaRecorderGeminiVoice();
           return true;
         },
-        stop: () => {
-          try {
-            if (recorder.state === 'recording') recorder.stop();
-          } catch (_) {}
-        },
+        stop: () => stopRec(),
         isSupported: true,
       } as any;
     } catch (err: any) {

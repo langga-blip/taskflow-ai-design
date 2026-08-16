@@ -39,6 +39,24 @@ export function getGeminiApiKey(): string {
   } catch {
     /* ignore */
   }
+  // Native SharedPreferences (survives WebView storage clears)
+  try {
+    const bridge = (window as any)?.AndroidBridge;
+    if (bridge && typeof bridge.getPref === 'function') {
+      const nativeKey = (bridge.getPref('taskflow_gemini_key') || '').trim();
+      if (nativeKey && nativeKey !== 'placeholder') {
+        try {
+          localStorage.setItem('taskflow_gemini_key', nativeKey);
+          localStorage.setItem('tf_gemini_api_key', nativeKey);
+        } catch {
+          /* ignore */
+        }
+        return nativeKey;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
   const envKey = (import.meta as any)?.env?.VITE_GEMINI_API_KEY;
   if (envKey && typeof envKey === 'string' && envKey.trim() && envKey !== 'placeholder') {
     return envKey.trim();
@@ -47,11 +65,19 @@ export function getGeminiApiKey(): string {
 }
 
 export function setGeminiApiKey(key: string): void {
+  const trimmed = (key || '').trim();
   try {
     if (typeof localStorage !== 'undefined') {
-      const trimmed = (key || '').trim();
       localStorage.setItem('taskflow_gemini_key', trimmed);
       localStorage.setItem('tf_gemini_api_key', trimmed);
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const bridge = (window as any)?.AndroidBridge;
+    if (bridge && typeof bridge.setPref === 'function') {
+      bridge.setPref('taskflow_gemini_key', trimmed);
     }
   } catch {
     /* ignore */
@@ -532,7 +558,11 @@ export async function transcribeAudioApi(audioData: string, mimeType: string = '
   const apiKey = getGeminiApiKey();
   if (apiKey && audioData) {
     const pure = audioData.includes(',') ? audioData.split(',')[1] : audioData;
-    for (const model of GEMINI_MODELS) {
+    const sttModels = ['gemini-3.7-flash', 'gemini-flash-latest', 'gemini-3.5-flash', ...GEMINI_MODELS];
+    const seen = new Set<string>();
+    for (const model of sttModels) {
+      if (seen.has(model)) continue;
+      seen.add(model);
       try {
         const url = `${GEMINI_BASE}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
         const res = await fetch(url, {

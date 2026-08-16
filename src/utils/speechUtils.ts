@@ -80,6 +80,108 @@ let activeGeminiAudio: HTMLAudioElement | null = null;
  * Speak with Gemini TTS voice "Kore" (same family as Google AI Studio / Gemini Live).
  * Falls back to native Android TTS, then browser speechSynthesis.
  */
+function getSpeechApiKey(): string {
+  try {
+    const fromLs =
+      localStorage.getItem('taskflow_gemini_key') ||
+      localStorage.getItem('tf_gemini_api_key') ||
+      '';
+    if (fromLs && fromLs !== 'placeholder') return fromLs.trim();
+  } catch {
+    /* ignore */
+  }
+  try {
+    const bridge = (window as any)?.AndroidBridge;
+    if (bridge && typeof bridge.getPref === 'function') {
+      const fromNative = bridge.getPref('taskflow_gemini_key') || '';
+      if (fromNative && fromNative !== 'placeholder') {
+        try {
+          localStorage.setItem('taskflow_gemini_key', fromNative);
+          localStorage.setItem('tf_gemini_api_key', fromNative);
+        } catch {
+          /* ignore */
+        }
+        return fromNative.trim();
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return '';
+}
+
+async function fetchKoreAudioUrl(apiKey: string, sentence: string): Promise<string | null> {
+  const ttsModels = [
+    'gemini-2.5-flash-preview-tts',
+    'gemini-2.5-pro-preview-tts',
+    'gemini-3.1-flash-tts-preview',
+  ];
+  for (const model of ttsModels) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: sentence }] }],
+          generationConfig: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: 'Kore' },
+              },
+            },
+          },
+        }),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const inline = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+      const b64 = inline?.data;
+      const mime = String(inline?.mimeType || '');
+      if (!b64) continue;
+      if (mime.includes('L16') || mime.includes('pcm')) {
+        const rateMatch = mime.match(/rate=(\d+)/);
+        const rate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+        return pcm16Base64ToWavDataUrl(b64, rate);
+      }
+      if (mime.includes('audio/')) return `data:${mime};base64,${b64}`;
+      return pcm16Base64ToWavDataUrl(b64, 24000);
+    } catch (err) {
+      console.warn('[Gemini TTS] error', model, err);
+    }
+  }
+  return null;
+}
+
+function playAudioUrl(audioUrl: string, onStart?: () => void): Promise<void> {
+  return new Promise((resolve) => {
+    let finished = false;
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      activeGeminiAudio = null;
+      resolve();
+    };
+    const audio = new Audio(audioUrl);
+    activeGeminiAudio = audio;
+    audio.onplay = () => {
+      try {
+        onStart?.();
+      } catch (_) {}
+    };
+    audio.onended = done;
+    audio.onerror = done;
+    window.setTimeout(done, 120000);
+    audio.play().catch(() => done());
+  });
+}
+
+/**
+ * Speak with Gemini TTS voice "Kore".
+ * Sentence pipeline: fetch/play first sentence ASAP while preparing the next (lower delay).
+ * Instant native TTS kicks in only if Kore is unavailable.
+ */
 export async function speakWithGeminiKoreVoice(
   text: string,
   options?: { onStart?: () => void; onEnd?: () => void }
@@ -91,98 +193,62 @@ export async function speakWithGeminiKoreVoice(
   }
 
   stopAllSpeech();
-
-  // Resolve API key from the same storage as chat
-  let apiKey = '';
-  try {
-    apiKey =
-      localStorage.getItem('taskflow_gemini_key') ||
-      localStorage.getItem('tf_gemini_api_key') ||
-      '';
-  } catch {
-    /* ignore */
-  }
-  if (!apiKey || apiKey === 'placeholder') {
-    // Fall through to native/browser TTS below via speakWithTaskFlowAiVoiceLegacy
+  const apiKey = getSpeechApiKey();
+  if (!apiKey) {
     speakWithTaskFlowAiVoiceLegacy(cleanText, options);
     return;
   }
 
-  const ttsModels = [
-    'gemini-2.5-flash-preview-tts',
-    'gemini-2.5-pro-preview-tts',
-    'gemini-3.1-flash-tts-preview',
-  ];
-
-  for (const model of ttsModels) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: cleanText }] }],
-          generationConfig: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: 'Kore' },
-              },
-            },
-          },
-        }),
-      });
-      if (!res.ok) {
-        console.warn('[Gemini TTS]', model, res.status);
-        continue;
-      }
-      const data = await res.json();
-      const inline = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
-      const b64 = inline?.data;
-      const mime = String(inline?.mimeType || '');
-      if (!b64) continue;
-
-      let audioUrl = '';
-      if (mime.includes('L16') || mime.includes('pcm')) {
-        const rateMatch = mime.match(/rate=(\d+)/);
-        const rate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
-        audioUrl = pcm16Base64ToWavDataUrl(b64, rate);
-      } else if (mime.includes('audio/')) {
-        audioUrl = `data:${mime};base64,${b64}`;
-      } else {
-        audioUrl = pcm16Base64ToWavDataUrl(b64, 24000);
-      }
-
-      await new Promise<void>((resolve) => {
-        let finished = false;
-        const done = () => {
-          if (finished) return;
-          finished = true;
-          activeGeminiAudio = null;
-          options?.onEnd?.();
-          resolve();
-        };
-        const audio = new Audio(audioUrl);
-        activeGeminiAudio = audio;
-        audio.onplay = () => {
-          try {
-            options?.onStart?.();
-          } catch (_) {}
-        };
-        audio.onended = done;
-        audio.onerror = done;
-        // Safety timeout
-        window.setTimeout(done, Math.min(180000, 3000 + cleanText.length * 120));
-        audio.play().catch(() => done());
-      });
-      return;
-    } catch (err) {
-      console.warn('[Gemini TTS] error', model, err);
+  // Split into short spoken chunks for faster time-to-first-audio
+  const rawChunks =
+    cleanText.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((s) => s.trim()).filter(Boolean) || [cleanText];
+  const chunks: string[] = [];
+  for (const c of rawChunks) {
+    if (c.length <= 180) chunks.push(c);
+    else {
+      // hard-split very long sentences
+      for (let i = 0; i < c.length; i += 160) chunks.push(c.slice(i, i + 160));
     }
   }
 
-  // Fallback: native Android / browser TTS
-  speakWithTaskFlowAiVoiceLegacy(cleanText, options);
+  let started = false;
+  try {
+    // Prefetch first chunk immediately
+    let nextUrlPromise = fetchKoreAudioUrl(apiKey, chunks[0]);
+    for (let i = 0; i < chunks.length; i++) {
+      const url = await nextUrlPromise;
+      // Prefetch following chunk while current plays
+      if (i + 1 < chunks.length) {
+        nextUrlPromise = fetchKoreAudioUrl(apiKey, chunks[i + 1]);
+      }
+      if (!url) {
+        // Kore failed for this chunk — finish remaining with native for continuity
+        const rest = chunks.slice(i).join(' ');
+        await new Promise<void>((resolve) => {
+          speakWithTaskFlowAiVoiceLegacy(rest, {
+            onStart: !started
+              ? () => {
+                  started = true;
+                  options?.onStart?.();
+                }
+              : undefined,
+            onEnd: () => resolve(),
+          });
+        });
+        options?.onEnd?.();
+        return;
+      }
+      await playAudioUrl(url, !started ? () => {
+        started = true;
+        options?.onStart?.();
+      } : undefined);
+    }
+    options?.onEnd?.();
+  } catch (err) {
+    console.warn('[Gemini Kore pipeline]', err);
+    if (!started) speakWithTaskFlowAiVoiceLegacy(cleanText, options);
+    else options?.onEnd?.();
+  }
 }
 
 

@@ -401,6 +401,21 @@ class MainActivity : ComponentActivity() {
 
         @JavascriptInterface
         fun isTtsAvailable(): Boolean = ttsReady
+
+        /** Persist small values (e.g. Gemini API key) so they survive WebView reloads */
+        @JavascriptInterface
+        fun setPref(key: String, value: String) {
+            getSharedPreferences("taskflow_prefs", MODE_PRIVATE)
+                .edit()
+                .putString(key, value)
+                .apply()
+        }
+
+        @JavascriptInterface
+        fun getPref(key: String): String {
+            return getSharedPreferences("taskflow_prefs", MODE_PRIVATE)
+                .getString(key, "") ?: ""
+        }
     }
 
     @Deprecated("Deprecated in Java")
