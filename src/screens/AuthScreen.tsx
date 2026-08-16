@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { GlassCard } from '../components/GlassCard';
 import { NeonButton } from '../components/NeonButton';
 import { SearchableCountrySelector } from '../components/SearchableCountrySelector';
-import { signInWithGoogle } from '../lib/firebase';
+import { signInWithGoogle, hasNativeGoogleBridge } from '../lib/firebase';
 import {
   COUNTRIES_DATA,
   CountryData,
@@ -229,31 +229,29 @@ export const AuthScreen: React.FC = () => {
 
   const handleGoogleAuth = async () => {
     setIsSigningInGoogle(true);
-    // Android WebView / file://: Firebase popup OAuth is blocked — show account picker immediately
-    if (typeof window !== 'undefined' && window.location?.protocol === 'file:') {
-      setShowGoogleAccountPicker(true);
-      setIsSigningInGoogle(false);
-      return;
-    }
     try {
+      // APK: native bridge shows the REAL system Google account chooser
+      // (Gmail + Drive + Calendar scopes). Web: Firebase popup.
       const res = await signInWithGoogle();
-      // If Firebase popup fails or returns synthetic fallback user, show picker
-      const isFallback =
-        !res?.user?.email ||
-        res.user.email === 'executive.user@gmail.com' ||
-        res.user.uid === 'workspace-google-user-001';
-      if (isFallback) {
-        setShowGoogleAccountPicker(true);
-        setIsSigningInGoogle(false);
-        return;
+      if (!res?.user?.email) {
+        throw new Error('No email returned from Google Sign-In');
       }
       completeGoogleSignIn(
-        res.user.displayName || name || 'Alex Rivera',
-        res.user.email || email || 'alex.rivera@gmail.com'
+        res.user.displayName || name || 'Google User',
+        res.user.email
       );
     } catch (err: any) {
-      console.warn('Google auth notice — opening account picker:', err);
-      setShowGoogleAccountPicker(true);
+      console.warn('Google auth error:', err);
+      // Last-resort demo picker only when native bridge is unavailable (e.g. plain browser without popup)
+      if (!hasNativeGoogleBridge()) {
+        setShowGoogleAccountPicker(true);
+      } else {
+        triggerNotification(
+          'Google Sign-In Failed',
+          err?.message || 'Could not sign in with Google. Check Google Play services and SHA-1 setup.',
+          'SYSTEM'
+        );
+      }
       setIsSigningInGoogle(false);
     }
   };

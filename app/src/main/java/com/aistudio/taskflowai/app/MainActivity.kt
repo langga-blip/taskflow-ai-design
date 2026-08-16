@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
+import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -17,21 +19,46 @@ import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import com.google.android.gms.auth.GoogleAuthUtil
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.Scope
+import org.json.JSONObject
+import java.util.concurrent.Executors
 
 /**
- * Hosts the full TaskFlow AI (Google AI Studio) React app in a WebView.
- * The Vite build is copied to assets/www by CI (or locally via npm run build).
+ * Hosts the full TaskFlow AI React app in a WebView.
  *
- * Supports:
- * - Mic / camera permission prompts from the page
- * - HTML file input / image uploader (onShowFileChooser)
- * - SPA navigation kept inside the WebView
+ * - Real Google account picker via native Google Sign-In (Gmail / Drive / Calendar scopes)
+ * - JS bridge: AndroidBridge.signInWithGoogle() / signOutGoogle()
+ * - Mic / camera permissions + multi-image file chooser
  */
 class MainActivity : ComponentActivity() {
 
     private var webView: WebView? = null
     private var pendingPermissionRequest: PermissionRequest? = null
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private lateinit var googleSignInClient: GoogleSignInClient
+    private val bgExecutor = Executors.newSingleThreadExecutor()
+
+    // Web OAuth client ID from firebase-applet-config (used for id token).
+    // Register an Android OAuth client with your debug/release SHA-1 in Google Cloud Console
+    // and ensure google-services.json contains oauth_client entries.
+    private val webClientId =
+        "669174966035-ja824v9iirlg204vbdtv1g01774miph4.apps.googleusercontent.com"
+
+    private val oauthScope =
+        "oauth2:" +
+            "https://www.googleapis.com/auth/gmail.readonly " +
+            "https://www.googleapis.com/auth/gmail.send " +
+            "https://www.googleapis.com/auth/drive.readonly " +
+            "https://www.googleapis.com/auth/calendar.readonly " +
+            "https://www.googleapis.com/auth/userinfo.email " +
+            "https://www.googleapis.com/auth/userinfo.profile"
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -75,9 +102,49 @@ class MainActivity : ComponentActivity() {
         callback.onReceiveValue(if (uris.isEmpty()) null else uris.toTypedArray())
     }
 
+    private val googleSignInLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            if (account != null) {
+                deliverGoogleAccount(account)
+            } else {
+                notifyJsGoogleError("No Google account returned")
+            }
+        } catch (e: ApiException) {
+            val msg = when (e.statusCode) {
+                GoogleSignInStatusCodes.SIGN_IN_CANCELLED -> "Sign-in cancelled"
+                GoogleSignInStatusCodes.NETWORK_ERROR -> "Network error during Google Sign-In"
+                GoogleSignInStatusCodes.DEVELOPER_ERROR ->
+                    "Google Sign-In misconfigured (SHA-1 / OAuth client). Add your app SHA-1 in Google Cloud Console."
+                else -> "Google Sign-In failed (${e.statusCode}): ${e.message}"
+            }
+            Log.w(TAG, msg, e)
+            notifyJsGoogleError(msg)
+        } catch (e: Exception) {
+            Log.w(TAG, "Google Sign-In error", e)
+            notifyJsGoogleError(e.message ?: "Google Sign-In failed")
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .requestProfile()
+            .requestIdToken(webClientId)
+            .requestScopes(
+                Scope("https://www.googleapis.com/auth/gmail.readonly"),
+                Scope("https://www.googleapis.com/auth/gmail.send"),
+                Scope("https://www.googleapis.com/auth/drive.readonly"),
+                Scope("https://www.googleapis.com/auth/calendar.readonly")
+            )
+            .build()
+        googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         webView = WebView(this).apply {
             settings.apply {
@@ -94,6 +161,8 @@ class MainActivity : ComponentActivity() {
                 @Suppress("DEPRECATION")
                 allowUniversalAccessFromFileURLs = true
             }
+
+            addJavascriptInterface(AndroidBridge(), "AndroidBridge")
 
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(
@@ -196,6 +265,62 @@ class MainActivity : ComponentActivity() {
         setContentView(webView)
     }
 
+    private fun deliverGoogleAccount(account: GoogleSignInAccount) {
+        bgExecutor.execute {
+            var accessToken = ""
+            try {
+                accessToken = GoogleAuthUtil.getToken(this, account.account!!, oauthScope)
+            } catch (e: Exception) {
+                Log.w(TAG, "GoogleAuthUtil.getToken failed", e)
+            }
+
+            val payload = JSONObject().apply {
+                put("success", true)
+                put("email", account.email ?: "")
+                put("displayName", account.displayName ?: "")
+                put("photoUrl", account.photoUrl?.toString() ?: "")
+                put("id", account.id ?: "")
+                put("idToken", account.idToken ?: "")
+                put("accessToken", accessToken)
+                put("serverAuthCode", account.serverAuthCode ?: "")
+            }
+
+            runOnUiThread {
+                val js =
+                    "window.onNativeGoogleSignIn && window.onNativeGoogleSignIn($payload);"
+                webView?.evaluateJavascript(js, null)
+            }
+        }
+    }
+
+    private fun notifyJsGoogleError(message: String) {
+        val safe = JSONObject.quote(message)
+        val js =
+            "window.onNativeGoogleSignIn && window.onNativeGoogleSignIn({success:false,error:$safe});"
+        webView?.evaluateJavascript(js, null)
+    }
+
+    inner class AndroidBridge {
+        @JavascriptInterface
+        fun signInWithGoogle() {
+            runOnUiThread {
+                googleSignInClient.signOut().addOnCompleteListener {
+                    googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun signOutGoogle() {
+            runOnUiThread {
+                googleSignInClient.signOut()
+            }
+        }
+
+        @JavascriptInterface
+        fun isNativeGoogleAvailable(): Boolean = true
+    }
+
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         val wv = webView
@@ -210,6 +335,11 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         webView?.destroy()
         webView = null
+        bgExecutor.shutdownNow()
         super.onDestroy()
+    }
+
+    companion object {
+        private const val TAG = "TaskFlowMain"
     }
 }

@@ -25,60 +25,134 @@ export interface GoogleAuthUser {
   uid?: string;
 }
 
+function persistGoogleToken(token: string, email?: string | null) {
+  cachedAccessToken = token || null;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      if (token) localStorage.setItem('tf_google_access_token', token);
+      else localStorage.removeItem('tf_google_access_token');
+      if (email) localStorage.setItem('tf_google_email', email);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getStoredGoogleAccessToken(): string {
+  if (cachedAccessToken) return cachedAccessToken;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('tf_google_access_token') || '';
+    }
+  } catch {
+    /* ignore */
+  }
+  return '';
+}
+
+/** True when running inside the Android APK WebView with native Google Sign-In bridge */
+export function hasNativeGoogleBridge(): boolean {
+  try {
+    const bridge = (window as any).AndroidBridge;
+    return !!(bridge && typeof bridge.signInWithGoogle === 'function');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Prefer native Android Google Sign-In (real account picker + Gmail/Drive/Calendar scopes).
+ * Falls back to Firebase popup on web. Does NOT silently invent a fake account.
+ */
 export const signInWithGoogle = async (): Promise<{ user: GoogleAuthUser; accessToken: string }> => {
+  // 1) Native APK path — shows the real system Google account chooser
+  if (hasNativeGoogleBridge()) {
+    return new Promise((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        cleanup();
+        reject(new Error('Google Sign-In timed out. Try again.'));
+      }, 120000);
+
+      const cleanup = () => {
+        window.clearTimeout(timeout);
+        try {
+          delete (window as any).onNativeGoogleSignIn;
+        } catch {
+          (window as any).onNativeGoogleSignIn = undefined;
+        }
+      };
+
+      (window as any).onNativeGoogleSignIn = (payload: any) => {
+        cleanup();
+        if (!payload || payload.success === false) {
+          reject(new Error(payload?.error || 'Google Sign-In failed'));
+          return;
+        }
+        const accessToken = payload.accessToken || '';
+        persistGoogleToken(accessToken, payload.email);
+        resolve({
+          user: {
+            displayName: payload.displayName || null,
+            email: payload.email || null,
+            photoURL: payload.photoUrl || null,
+            uid: payload.id || payload.email || undefined,
+          },
+          accessToken,
+        });
+      };
+
+      try {
+        (window as any).AndroidBridge.signInWithGoogle();
+      } catch (err: any) {
+        cleanup();
+        reject(new Error(err?.message || 'Could not start native Google Sign-In'));
+      }
+    });
+  }
+
+  // 2) Browser / AI Studio — Firebase popup with real Google accounts
   try {
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     const token = credential?.accessToken || null;
-    if (token) {
-      cachedAccessToken = token;
-    }
+    if (token) persistGoogleToken(token, result.user.email);
     return {
       user: {
         displayName: result.user.displayName,
         email: result.user.email,
         photoURL: result.user.photoURL,
-        uid: result.user.uid
+        uid: result.user.uid,
       },
-      accessToken: token || ''
+      accessToken: token || '',
     };
   } catch (error: any) {
     const errorCode = error?.code || '';
-    if (
-      errorCode === 'auth/network-request-failed' ||
-      errorCode === 'auth/popup-closed-by-user' ||
-      errorCode === 'auth/popup-blocked' ||
-      errorCode === 'auth/cancelled-popup-request' ||
-      errorCode === 'auth/internal-error'
-    ) {
-      console.info('Google authentication redirected to workspace environment fallback:', errorCode);
-    } else {
-      console.info('Google authentication completed with workspace context');
-    }
-
-    const fallbackUser: GoogleAuthUser = {
-      displayName: 'Google Workspace Executive',
-      email: 'executive.user@gmail.com',
-      photoURL: null,
-      uid: 'workspace-google-user-001'
-    };
-    return {
-      user: fallbackUser,
-      accessToken: cachedAccessToken || 'workspace_access_token_verified'
-    };
+    console.warn('Firebase Google Sign-In failed:', errorCode, error?.message);
+    throw new Error(
+      error?.message ||
+        'Google Sign-In was blocked or cancelled. On the APK, use the native Google button; on web allow popups.'
+    );
   }
 };
 
 export const signOutUser = async (): Promise<void> => {
   try {
+    if (hasNativeGoogleBridge()) {
+      try {
+        (window as any).AndroidBridge.signOutGoogle();
+      } catch {
+        /* ignore */
+      }
+    }
     await firebaseSignOut(auth);
+    persistGoogleToken('');
     cachedAccessToken = null;
   } catch (err) {
     console.warn('Sign out notice:', err);
   }
 };
 
-export const getCachedAccessToken = () => cachedAccessToken;
+export const getCachedAccessToken = () => getStoredGoogleAccessToken();
 
 // Firestore sync helpers
 export async function syncUserProfileToFirestore(userId: string, profile: any) {

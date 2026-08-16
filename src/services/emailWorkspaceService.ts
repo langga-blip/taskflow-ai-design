@@ -49,19 +49,66 @@ export const INITIAL_GMAIL_MESSAGES: IncomingEmailMessage[] = [
 /**
  * Syncs Gmail messages via Workspace API or returns local inbox items
  */
-export async function fetchWorkspaceGmailMessages(userEmail?: string): Promise<IncomingEmailMessage[]> {
+function getGoogleAccessToken(): string {
   try {
-    // If OAuth token is stored or available via window.gapi / Google Workspace
-    const gapiToken = typeof window !== 'undefined' ? (window as any).gapi?.auth2?.getAuthInstance()?.currentUser?.get()?.getAuthResponse()?.access_token : null;
-    if (gapiToken) {
-      const res = await fetch('https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=5&q=is:unread', {
-        headers: { Authorization: `Bearer ${gapiToken}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        console.log('[Gmail Workspace API] Synced incoming emails:', data);
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('tf_google_access_token') || '';
+    }
+  } catch {
+    /* ignore */
+  }
+  return '';
+}
+
+export async function fetchWorkspaceGmailMessages(userEmail?: string): Promise<IncomingEmailMessage[]> {
+  const token = getGoogleAccessToken();
+  if (!token) {
+    return INITIAL_GMAIL_MESSAGES;
+  }
+
+  try {
+    const listRes = await fetch(
+      'https://www.googleapis.com/gmail/v1/users/me/messages?maxResults=8&q=in:inbox',
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!listRes.ok) {
+      console.warn('[Gmail] list failed', listRes.status, await listRes.text().catch(() => ''));
+      return INITIAL_GMAIL_MESSAGES;
+    }
+    const listData = await listRes.json();
+    const ids: string[] = (listData.messages || []).map((m: any) => m.id).filter(Boolean);
+    if (!ids.length) return [];
+
+    const messages: IncomingEmailMessage[] = [];
+    for (const id of ids.slice(0, 8)) {
+      try {
+        const msgRes = await fetch(
+          `https://www.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!msgRes.ok) continue;
+        const msg = await msgRes.json();
+        const headers: Record<string, string> = {};
+        for (const h of msg.payload?.headers || []) {
+          if (h?.name && h?.value) headers[String(h.name).toLowerCase()] = h.value;
+        }
+        const from = headers['from'] || 'Unknown';
+        const nameMatch = from.match(/^"?([^"<]+)"?\s*</);
+        const emailMatch = from.match(/<([^>]+)>/);
+        messages.push({
+          id: msg.id || id,
+          senderName: (nameMatch?.[1] || from).trim(),
+          senderEmail: (emailMatch?.[1] || from).trim(),
+          subject: headers['subject'] || '(no subject)',
+          body: msg.snippet || '',
+          timestamp: headers['date'] || 'recent',
+          suggestedReplies: [],
+        });
+      } catch (e) {
+        console.warn('[Gmail] message fetch notice', e);
       }
     }
+    if (messages.length) return messages;
   } catch (err) {
     console.warn('[Gmail Workspace Service] API notice:', err);
   }
