@@ -561,7 +561,7 @@ export async function transcribeAudioApi(audioData: string, mimeType: string = '
     }
   }
 
-  return 'Review today’s revenue milestones and audit active task proposals.';
+  return '';
 }
 
 export async function suggestEmailReplyApi(

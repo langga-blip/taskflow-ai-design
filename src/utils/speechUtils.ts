@@ -7,6 +7,12 @@ let activeSpeechUtterances: SpeechSynthesisUtterance[] = [];
  * Stop any ongoing speech synthesis
  */
 export const stopAllSpeech = () => {
+  try {
+    const bridge = (window as any)?.AndroidBridge;
+    if (bridge && typeof bridge.stopSpeaking === 'function') {
+      bridge.stopSpeaking();
+    }
+  } catch (e) {}
   if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
     try {
       window.speechSynthesis.cancel();
@@ -35,13 +41,53 @@ export const speakWithTaskFlowAiVoice = (
   text: string,
   options?: { onStart?: () => void; onEnd?: () => void }
 ) => {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+  const cleanText = cleanTextForSpeech(text || '');
+  if (!cleanText) {
+    options?.onEnd?.();
+    return;
+  }
+
+  // Prefer native Android TTS (WebView speechSynthesis is often silent)
+  try {
+    const bridge = (window as any)?.AndroidBridge;
+    if (bridge && typeof bridge.speak === 'function') {
+      stopAllSpeech();
+      let ended = false;
+      const finish = () => {
+        if (ended) return;
+        ended = true;
+        try {
+          delete (window as any).onNativeTtsEnd;
+          delete (window as any).onNativeTtsStart;
+        } catch (_) {}
+        options?.onEnd?.();
+      };
+      (window as any).onNativeTtsStart = () => {
+        try {
+          options?.onStart?.();
+        } catch (_) {}
+      };
+      (window as any).onNativeTtsEnd = finish;
+      // Safety: if TTS never fires onDone, unblock the voice loop
+      window.setTimeout(finish, Math.min(120000, 2500 + cleanText.length * 80));
+      try {
+        options?.onStart?.();
+      } catch (_) {}
+      bridge.speak(cleanText);
+      return;
+    }
+  } catch (e) {
+    console.warn('Native TTS bridge notice:', e);
+  }
+
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    options?.onEnd?.();
+    return;
+  }
 
   try {
     stopAllSpeech();
 
-    const cleanText = cleanTextForSpeech(text);
-    if (!cleanText) return;
 
     // Split text into natural conversational chunks if it's long, to avoid speech engine truncation
     const sentenceChunks = cleanText.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleanText];

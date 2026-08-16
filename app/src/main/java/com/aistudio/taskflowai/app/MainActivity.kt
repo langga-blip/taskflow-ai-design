@@ -27,7 +27,10 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import org.json.JSONObject
+import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
@@ -44,6 +47,8 @@ class MainActivity : ComponentActivity() {
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
     private lateinit var googleSignInClient: GoogleSignInClient
     private val bgExecutor = Executors.newSingleThreadExecutor()
+    private var tts: TextToSpeech? = null
+    private var ttsReady = false
 
     // Web OAuth client ID from firebase-applet-config (used for id token).
     // Register an Android OAuth client with your debug/release SHA-1 in Google Cloud Console
@@ -145,6 +150,45 @@ class MainActivity : ComponentActivity() {
             )
             .build()
         googleSignInClient = GoogleSignIn.getClient(this, gso)
+
+        tts = TextToSpeech(this) { status ->
+            ttsReady = status == TextToSpeech.SUCCESS
+            if (ttsReady) {
+                tts?.language = Locale.US
+                tts?.setSpeechRate(1.02f)
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        runOnUiThread {
+                            webView?.evaluateJavascript(
+                                "window.onNativeTtsStart && window.onNativeTtsStart();",
+                                null
+                            )
+                        }
+                    }
+
+                    override fun onDone(utteranceId: String?) {
+                        runOnUiThread {
+                            webView?.evaluateJavascript(
+                                "window.onNativeTtsEnd && window.onNativeTtsEnd();",
+                                null
+                            )
+                        }
+                    }
+
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) {
+                        runOnUiThread {
+                            webView?.evaluateJavascript(
+                                "window.onNativeTtsEnd && window.onNativeTtsEnd();",
+                                null
+                            )
+                        }
+                    }
+                })
+            } else {
+                Log.w(TAG, "TextToSpeech init failed: $status")
+            }
+        }
 
         webView = WebView(this).apply {
             settings.apply {
@@ -319,6 +363,44 @@ class MainActivity : ComponentActivity() {
 
         @JavascriptInterface
         fun isNativeGoogleAvailable(): Boolean = true
+
+        /** Native Android TTS — WebView speechSynthesis is often silent */
+        @JavascriptInterface
+        fun speak(text: String) {
+            runOnUiThread {
+                val clean = text.trim()
+                if (clean.isEmpty()) {
+                    webView?.evaluateJavascript(
+                        "window.onNativeTtsEnd && window.onNativeTtsEnd();",
+                        null
+                    )
+                    return@runOnUiThread
+                }
+                if (!ttsReady || tts == null) {
+                    Log.w(TAG, "TTS not ready")
+                    webView?.evaluateJavascript(
+                        "window.onNativeTtsEnd && window.onNativeTtsEnd();",
+                        null
+                    )
+                    return@runOnUiThread
+                }
+                val params = Bundle()
+                tts?.speak(clean, TextToSpeech.QUEUE_FLUSH, params, "taskflow_tts")
+            }
+        }
+
+        @JavascriptInterface
+        fun stopSpeaking() {
+            runOnUiThread {
+                try {
+                    tts?.stop()
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun isTtsAvailable(): Boolean = ttsReady
     }
 
     @Deprecated("Deprecated in Java")
@@ -333,6 +415,12 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        try {
+            tts?.stop()
+            tts?.shutdown()
+        } catch (_: Exception) {
+        }
+        tts = null
         webView?.destroy()
         webView = null
         bgExecutor.shutdownNow()

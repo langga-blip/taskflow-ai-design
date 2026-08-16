@@ -132,10 +132,27 @@ export const AiAssistantScreen: React.FC = () => {
   };
 
   /** APK / file:// fallback: SpeechRecognition OR MediaRecorder+Gemini transcribe -> askAssistant -> TTS */
+  const restartListeningIfActive = () => {
+    if (!isLiveActive) return;
+    setLiveState('listening');
+    setLiveUserTranscript('');
+    setLiveModelTranscript('');
+    sttFinalRef.current = '';
+    // Small gap so TTS / mic don't overlap
+    window.setTimeout(() => {
+      if (sttRecognizerRef.current && isLiveActive) {
+        try {
+          sttRecognizerRef.current.start();
+        } catch (_) {}
+      }
+    }, 400);
+  };
+
   const processSpokenAndReply = async (spoken: string) => {
     const text = (spoken || '').trim();
     if (!text) {
-      setLiveState('listening');
+      triggerNotification('Didn\'t catch that', 'Speak clearly for a few seconds, then wait for the reply.', 'AI');
+      restartListeningIfActive();
       return;
     }
     setLiveState('speaking');
@@ -155,14 +172,11 @@ export const AiAssistantScreen: React.FC = () => {
           setLiveModelTranscript('');
           setLiveUserTranscript('');
           sttFinalRef.current = '';
-          setLiveState('listening');
-          if (sttRecognizerRef.current) {
-            sttRecognizerRef.current.start();
-          }
+          restartListeningIfActive();
         },
       });
     } catch (e) {
-      setLiveState('listening');
+      restartListeningIfActive();
     }
   };
 
@@ -191,18 +205,19 @@ export const AiAssistantScreen: React.FC = () => {
           await processSpokenAndReply(spoken || '');
         } catch (err: any) {
           triggerNotification('Voice Notice', err?.message || 'Could not transcribe audio', 'AI');
-          setLiveState('listening');
+          restartListeningIfActive();
         }
       };
       // Record ~4s chunks for push-style turns in WebView
       recorder.start();
       setLiveState('listening');
-      setLiveUserTranscript('Listening… speak now');
+      setLiveUserTranscript('Listening… speak now (7s)');
+      setInputVolume(60);
       setTimeout(() => {
         try {
           if (recorder.state === 'recording') recorder.stop();
         } catch (_) {}
-      }, 4500);
+      }, 7000);
       // expose stop via recognizer-like handle
       sttRecognizerRef.current = {
         start: async () => {
