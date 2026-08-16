@@ -229,10 +229,15 @@ export const AuthScreen: React.FC = () => {
 
   const handleGoogleAuth = async () => {
     setIsSigningInGoogle(true);
-    // Always show multi-account picker in embedded WebView (popup OAuth is blocked)
+    // Android WebView / file://: Firebase popup OAuth is blocked — show account picker immediately
+    if (typeof window !== 'undefined' && window.location?.protocol === 'file:') {
+      setShowGoogleAccountPicker(true);
+      setIsSigningInGoogle(false);
+      return;
+    }
     try {
       const res = await signInWithGoogle();
-      // If Firebase popup somehow works, still offer picker when fallback synthetic user returned
+      // If Firebase popup fails or returns synthetic fallback user, show picker
       const isFallback =
         !res?.user?.email ||
         res.user.email === 'executive.user@gmail.com' ||

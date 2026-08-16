@@ -1,7 +1,20 @@
 import { Task, UserProfile, WeeklyReview, AiProvider } from '../types';
 
-const GEMINI_MODEL = 'gemini-2.0-flash';
+// Prefer alias that always points at current Flash; then stable fallbacks.
+const GEMINI_MODELS = [
+  'gemini-flash-latest',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+];
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+/** Last Gemini HTTP/network error (for UI diagnostics) */
+let lastGeminiError = '';
+
+export function getLastGeminiError(): string {
+  return lastGeminiError;
+}
 
 /** True when running inside Android WebView (or any file:// host) */
 export function isFileProtocol(): boolean {
@@ -35,7 +48,9 @@ export function getGeminiApiKey(): string {
 export function setGeminiApiKey(key: string): void {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('taskflow_gemini_key', (key || '').trim());
+      const trimmed = (key || '').trim();
+      localStorage.setItem('taskflow_gemini_key', trimmed);
+      localStorage.setItem('tf_gemini_api_key', trimmed);
     }
   } catch {
     /* ignore */
@@ -77,7 +92,10 @@ export async function callGeminiDirect(
   systemHint?: string
 ): Promise<string | null> {
   const apiKey = getGeminiApiKey();
-  if (!apiKey) return null;
+  if (!apiKey) {
+    lastGeminiError = 'No Gemini API key saved. Open Profile Settings and paste your key.';
+    return null;
+  }
 
   const fullPrompt = systemHint ? `${systemHint}\n\n${prompt}` : prompt;
   const body = {
@@ -93,25 +111,50 @@ export async function callGeminiDirect(
     },
   };
 
-  try {
-    const url = `${GEMINI_BASE}/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      console.warn('[Gemini Direct] HTTP', res.status, errText.slice(0, 200));
-      return null;
+  lastGeminiError = '';
+  let lastStatus = 0;
+  let lastBody = '';
+
+  for (const model of GEMINI_MODELS) {
+    try {
+      const url = `${GEMINI_BASE}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      lastStatus = res.status;
+      if (!res.ok) {
+        lastBody = await res.text().catch(() => '');
+        console.warn('[Gemini Direct]', model, res.status, lastBody.slice(0, 180));
+        // Try next model on 404 (retired model id)
+        if (res.status === 404) continue;
+        // Invalid key / quota — stop early
+        if (res.status === 400 || res.status === 401 || res.status === 403) {
+          lastGeminiError = `Gemini HTTP ${res.status}: ${(lastBody || '').slice(0, 160)}`;
+          return null;
+        }
+        continue;
+      }
+      const data = await res.json();
+      const text = extractGeminiText(data);
+      if (text) {
+        lastGeminiError = '';
+        return text;
+      }
+      lastGeminiError = 'Gemini returned an empty response.';
+    } catch (err: any) {
+      console.warn('[Gemini Direct] network error', model, err);
+      lastGeminiError = err?.message || 'Network error reaching Gemini.';
     }
-    const data = await res.json();
-    const text = extractGeminiText(data);
-    return text || null;
-  } catch (err) {
-    console.warn('[Gemini Direct] network error', err);
-    return null;
   }
+
+  if (!lastGeminiError) {
+    lastGeminiError = lastStatus
+      ? `Gemini HTTP ${lastStatus}: ${(lastBody || 'all models failed').slice(0, 160)}`
+      : 'Could not reach Gemini (network or all models failed).';
+  }
+  return null;
 }
 
 function executiveSystemHint(profile: UserProfile): string {
@@ -290,7 +333,8 @@ export async function askAssistantApi(
   }
 
   if (imageList.length > 0) {
-    return `### Visual Analysis unavailable\n\nCould not reach Gemini online. Check network and that your API key is valid.\n\nRequest: *"${rawPrompt || 'Image audit'}"* for **${biz}**.`;
+    const detail = getLastGeminiError();
+    return `### Visual Analysis unavailable\n\nCould not reach Gemini online.${detail ? `\n\n**Details:** ${detail}` : ''}\n\nCheck network and that your API key is valid.\n\nRequest: *"${rawPrompt || 'Image audit'}"* for **${biz}**.`;
   }
 
   if (/^(hi|hello|hey|greetings|howdy|sup|yo)\b/i.test(p) || p === 'hi' || p === 'hello') {
@@ -301,7 +345,8 @@ export async function askAssistantApi(
     return `### Drafted Message for **${biz}** ✉️\n\n**Subject**: Strategic Growth & Next Steps for [Client]\n\n**Hi [Client Name]**,\n\nI hope you're having a productive week.\n\nI wanted to follow up on our recent discussion regarding your growth initiatives. We've mapped out a high-impact roadmap designed to save your team 20+ hours weekly and accelerate delivery.\n\nLet me know if you have 10 minutes this week to align on next steps!\n\nBest,\n**${name}** | **${biz}**`;
   }
 
-  return `### Could not reach online AI\n\nHello ${name}. Gemini request failed (network or key). Retry in a moment.\n\n> *"${rawPrompt}"*`;
+  const detail = getLastGeminiError();
+  return `### Could not reach online AI\n\nHello ${name}. Gemini request failed.\n\n${detail ? `**Details:** ${detail}\n\n` : ''}Check that your key is valid at [aistudio.google.com/apikey](https://aistudio.google.com/apikey), you tapped **Save Gemini Key** in Profile, and the device is online.\n\n> *"${rawPrompt}"*`;
 }
 
 export async function generateWeeklyReviewApi(
@@ -468,31 +513,33 @@ export async function transcribeAudioApi(audioData: string, mimeType: string = '
   // Direct Gemini multimodal transcription when key is set
   const apiKey = getGeminiApiKey();
   if (apiKey && audioData) {
-    try {
-      const pure = audioData.includes(',') ? audioData.split(',')[1] : audioData;
-      const url = `${GEMINI_BASE}/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                { text: 'Transcribe this audio exactly. Return only the spoken words.' },
-                { inlineData: { mimeType: mimeType || 'audio/webm', data: pure } },
-              ],
-            },
-          ],
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const text = extractGeminiText(data);
-        if (text) return text;
+    const pure = audioData.includes(',') ? audioData.split(',')[1] : audioData;
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `${GEMINI_BASE}/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  { text: 'Transcribe this audio exactly. Return only the spoken words.' },
+                  { inlineData: { mimeType: mimeType || 'audio/webm', data: pure } },
+                ],
+              },
+            ],
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const text = extractGeminiText(data);
+          if (text) return text;
+        }
+      } catch (err) {
+        console.warn('Gemini transcribe notice:', model, err);
       }
-    } catch (err) {
-      console.warn('Gemini transcribe notice:', err);
     }
   }
 
