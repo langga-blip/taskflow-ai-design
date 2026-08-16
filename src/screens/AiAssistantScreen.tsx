@@ -9,6 +9,7 @@ import { GeminiLiveSessionController, GeminiLiveState } from '../utils/geminiLiv
 import { OpenAiVoiceSessionController, OpenAiVoiceState } from '../utils/openaiVoiceAudio';
 import { VoiceEngineProvider } from '../types';
 import { autoCorrectText } from '../utils/autoCorrect';
+import { transcribeAudioApi, isFileProtocol } from '../services/api';
 
 interface ChatMessage {
   id: string;
@@ -130,7 +131,98 @@ export const AiAssistantScreen: React.FC = () => {
     setOutputVolume(0);
   };
 
-  /** APK / file:// fallback: SpeechRecognition -> online Gemini (askAssistant) -> TTS */
+  /** APK / file:// fallback: SpeechRecognition OR MediaRecorder+Gemini transcribe -> askAssistant -> TTS */
+  const processSpokenAndReply = async (spoken: string) => {
+    const text = (spoken || '').trim();
+    if (!text) {
+      setLiveState('listening');
+      return;
+    }
+    setLiveState('speaking');
+    setInputVolume(0);
+    setLiveUserTranscript(text);
+    try {
+      const reply = await askAssistant(text);
+      setLiveModelTranscript(reply);
+      const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now().toString(), sender: 'user', text, timestamp },
+        { id: (Date.now() + 1).toString(), sender: 'assistant', text: reply, timestamp },
+      ]);
+      speakWithTaskFlowAiVoice(reply, {
+        onEnd: () => {
+          setLiveModelTranscript('');
+          setLiveUserTranscript('');
+          sttFinalRef.current = '';
+          setLiveState('listening');
+          if (sttRecognizerRef.current) {
+            sttRecognizerRef.current.start();
+          }
+        },
+      });
+    } catch (e) {
+      setLiveState('listening');
+    }
+  };
+
+  const startMediaRecorderGeminiVoice = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      const recorder = new MediaRecorder(stream);
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        try {
+          const blob = new Blob(chunks, { type: mime });
+          const reader = new FileReader();
+          const dataUrl: string = await new Promise((resolve, reject) => {
+            reader.onloadend = () => resolve(String(reader.result || ''));
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          setLiveState('connecting');
+          setLiveUserTranscript('Transcribing…');
+          const spoken = await transcribeAudioApi(dataUrl, mime);
+          await processSpokenAndReply(spoken || '');
+        } catch (err: any) {
+          triggerNotification('Voice Notice', err?.message || 'Could not transcribe audio', 'AI');
+          setLiveState('listening');
+        }
+      };
+      // Record ~4s chunks for push-style turns in WebView
+      recorder.start();
+      setLiveState('listening');
+      setLiveUserTranscript('Listening… speak now');
+      setTimeout(() => {
+        try {
+          if (recorder.state === 'recording') recorder.stop();
+        } catch (_) {}
+      }, 4500);
+      // expose stop via recognizer-like handle
+      sttRecognizerRef.current = {
+        start: async () => {
+          await startMediaRecorderGeminiVoice();
+          return true;
+        },
+        stop: () => {
+          try {
+            if (recorder.state === 'recording') recorder.stop();
+          } catch (_) {}
+        },
+        isSupported: true,
+      } as any;
+    } catch (err: any) {
+      triggerNotification('Mic Permission', err?.message || 'Microphone access denied', 'AI');
+      setIsLiveActive(false);
+      setLiveState('error');
+    }
+  };
+
   const startSttGeminiVoiceFallback = async () => {
     setIsLiveActive(true);
     setLiveState('listening');
@@ -139,9 +231,20 @@ export const AiAssistantScreen: React.FC = () => {
     sttFinalRef.current = '';
     triggerNotification(
       'Voice Chat Active 🎙️',
-      'Using speech-to-text + online Gemini + voice reply (WebView mode).',
+      'Speech + online Gemini + spoken reply. Allow microphone if prompted.',
       'AI'
     );
+
+    const SpeechRecognition =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
+
+    // Android WebView often has no Web Speech API → MediaRecorder + Gemini transcribe
+    if (!SpeechRecognition || isFileProtocol()) {
+      await startMediaRecorderGeminiVoice();
+      return;
+    }
 
     const recognizer = createVoiceRecognizer(
       (partial) => {
@@ -150,40 +253,11 @@ export const AiAssistantScreen: React.FC = () => {
         setInputVolume(Math.min(100, 30 + (partial.length % 40)));
       },
       (errMsg) => {
-        triggerNotification('Voice Notice', errMsg || 'Speech recognition issue', 'AI');
+        triggerNotification('Voice Notice', errMsg || 'Speech recognition issue — trying mic recorder', 'AI');
+        startMediaRecorderGeminiVoice();
       },
       async () => {
-        const spoken = (sttFinalRef.current || '').trim();
-        if (!spoken) {
-          setLiveState('listening');
-          return;
-        }
-        setLiveState('speaking');
-        setInputVolume(0);
-        try {
-          const reply = await askAssistant(spoken);
-          setLiveModelTranscript(reply);
-          const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          setMessages((prev) => [
-            ...prev,
-            { id: Date.now().toString(), sender: 'user', text: spoken, timestamp },
-            { id: (Date.now() + 1).toString(), sender: 'assistant', text: reply, timestamp },
-          ]);
-          speakWithTaskFlowAiVoice(reply, {
-            onEnd: () => {
-              setLiveModelTranscript('');
-              setLiveUserTranscript('');
-              sttFinalRef.current = '';
-              setLiveState('listening');
-              // Restart listening for continuous conversation
-              if (sttRecognizerRef.current) {
-                sttRecognizerRef.current.start();
-              }
-            },
-          });
-        } catch (e) {
-          setLiveState('listening');
-        }
+        await processSpokenAndReply(sttFinalRef.current || '');
       }
     );
     sttRecognizerRef.current = recognizer;

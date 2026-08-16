@@ -2,9 +2,10 @@ import { Task, UserProfile, WeeklyReview, AiProvider } from '../types';
 
 // Only models confirmed working with current Gemini API keys (retired IDs removed).
 const GEMINI_MODELS = [
+  'gemini-3.7-flash',
   'gemini-flash-latest',
-  'gemini-flash-lite-latest',
   'gemini-3.5-flash',
+  'gemini-flash-lite-latest',
   'gemini-pro-latest',
 ];
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
@@ -127,13 +128,13 @@ export async function callGeminiDirect(
       if (!res.ok) {
         lastBody = await res.text().catch(() => '');
         console.warn('[Gemini Direct]', model, res.status, lastBody.slice(0, 180));
-        // Try next model on 404 (retired model id)
-        if (res.status === 404) continue;
-        // Invalid key / quota — stop early
+        // Invalid key — stop early
         if (res.status === 400 || res.status === 401 || res.status === 403) {
           lastGeminiError = `Gemini HTTP ${res.status}: ${(lastBody || '').slice(0, 160)}`;
           return null;
         }
+        // 404 / 503 / other → try next model
+        lastGeminiError = `Gemini HTTP ${res.status} (${model}): ${(lastBody || '').slice(0, 160)}`;
         continue;
       }
       const data = await res.json();
@@ -163,12 +164,24 @@ export async function callGeminiDirect(
 }
 
 function executiveSystemHint(profile: UserProfile): string {
-  const name = profile?.userName || 'Executive';
-  const biz = profile?.businessName || 'Your Business';
+  const name = profile?.userName || 'there';
+  const biz = profile?.businessName || '';
   const symbol = profile?.currencySymbol || '$';
-  const goal = (profile?.monthlyRevenueGoal !== undefined ? profile.monthlyRevenueGoal : 10000).toLocaleString();
-  const industry = profile?.industry || 'business';
-  return `You are TaskFlow AI, a 24/7 executive business assistant for ${name} at ${biz} (${industry}). Revenue goal: ${symbol}${goal}/mo. Be concise, actionable, and use markdown headings/bullets. If images are attached, analyze them thoroughly (text, numbers, charts, layout) and tie insights to growth for ${biz}.`;
+  const goalRaw = profile?.monthlyRevenueGoal;
+  const goal = goalRaw !== undefined && goalRaw !== null ? Number(goalRaw).toLocaleString() : '';
+  const industry = profile?.industry || '';
+  const contextBits: string[] = [];
+  if (biz) contextBits.push(`business name "${biz}"`);
+  if (industry) contextBits.push(`industry "${industry}"`);
+  if (goal && goal !== '0') contextBits.push(`monthly goal around ${symbol}${goal}`);
+  const context = contextBits.length ? ` Optional context: ${contextBits.join(', ')}.` : '';
+  return [
+    'You are TaskFlow AI, powered by Gemini — a helpful, natural assistant similar to Google AI Studio.',
+    'Chat freely about anything the user asks: everyday questions, writing, ideas, coding, analysis, or business.',
+    'Do NOT force every answer onto revenue, sales, funnels, or growth. Only discuss those when the user asks or when it clearly fits.',
+    'Be warm, clear, and useful. Use short markdown when helpful. If images are attached, analyze them carefully.',
+    `The user is ${name}.${context}`,
+  ].join(' ');
 }
 
 export async function fetchExchangeRates(): Promise<Record<string, number>> {
