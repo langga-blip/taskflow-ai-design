@@ -8,6 +8,7 @@ import {
   GENDER_OPTIONS,
   getCountryByName,
 } from '../data/countriesData';
+import { getGeminiApiKey, setGeminiApiKey } from '../services/api';
 import {
   Building2,
   Crown,
@@ -23,6 +24,10 @@ import {
   Phone,
   Mail,
   User,
+  KeyRound,
+  Wifi,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 export const ProfileSettingsScreen: React.FC = () => {
@@ -54,6 +59,23 @@ export const ProfileSettingsScreen: React.FC = () => {
   const [monthlyRevenueGoal, setMonthlyRevenueGoal] = useState<string | number>(
     userProfile.monthlyRevenueGoal !== undefined ? userProfile.monthlyRevenueGoal : 0
   );
+
+  const [geminiKey, setGeminiKeyLocal] = useState(() => getGeminiApiKey());
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [geminiKeySaved, setGeminiKeySaved] = useState(!!getGeminiApiKey());
+
+  const handleSaveGeminiKey = () => {
+    const trimmed = (geminiKey || '').trim();
+    setGeminiApiKey(trimmed);
+    setGeminiKeySaved(!!trimmed);
+    triggerNotification(
+      trimmed ? 'Online AI Connected 🟢' : 'Gemini Key Cleared',
+      trimmed
+        ? 'Gemini API key saved on device. AI Assistant will use real online Gemini replies.'
+        : 'Key removed. Paste a key from aistudio.google.com/apikey to enable online AI.',
+      'AI'
+    );
+  };
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,6 +163,59 @@ export const ProfileSettingsScreen: React.FC = () => {
               </button>
             )}
           </div>
+        </div>
+      </GlassCard>
+
+      {/* Online AI Connection — required for real Gemini in APK */}
+      <GlassCard className="space-y-3 border-[#06B6D4]/40">
+        <h2 className="font-bold text-base flex items-center gap-2">
+          <Wifi className={`w-5 h-5 ${geminiKeySaved ? 'text-emerald-400' : 'text-[#06B6D4]'}`} />
+          Online AI Connection
+          {geminiKeySaved && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+              Connected
+            </span>
+          )}
+        </h2>
+        <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+          Paste your <strong>Gemini API key</strong> from{' '}
+          <a
+            href="https://aistudio.google.com/apikey"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[#06B6D4] font-semibold underline"
+          >
+            aistudio.google.com/apikey
+          </a>
+          . This is <em>not</em> the Firebase key in google-services.json. Required for real online chat, vision, and voice replies in the APK.
+        </p>
+        <div className="relative">
+          <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type={showGeminiKey ? 'text' : 'password'}
+            value={geminiKey}
+            onChange={(e) => setGeminiKeyLocal(e.target.value)}
+            placeholder="AIza... your Gemini API key"
+            className={`w-full border rounded-xl pl-10 pr-11 py-2.5 text-sm font-mono focus:outline-none focus:border-[#06B6D4] ${
+              isLight
+                ? 'bg-slate-100 border-slate-300 text-slate-900'
+                : 'bg-[#0A0C14] border-[#2E3552] text-white'
+            }`}
+            autoComplete="off"
+          />
+          <button
+            type="button"
+            onClick={() => setShowGeminiKey((v) => !v)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-[#06B6D4] cursor-pointer"
+            title={showGeminiKey ? 'Hide key' : 'Show key'}
+          >
+            {showGeminiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
+        <div className="flex justify-end">
+          <NeonButton type="button" size="md" onClick={handleSaveGeminiKey}>
+            <Save className="w-4 h-4" /> Save Gemini Key
+          </NeonButton>
         </div>
       </GlassCard>
 
